@@ -1,0 +1,10 @@
+# build artifacts
+firmware/.pio/
+__pycache__/
+*.pyc
+
+# runtime files (may reflect local activity)
+companion/buddy.log
+
+# personal overrides (safe to commit, but machine-specific)
+companion/buddy_config.json
