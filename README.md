@@ -57,7 +57,9 @@ First-time flash on a factory board: hold BOOT, tap PWR, release BOOT.
 After that, flashing needs no buttons.
 
 **Companion**: `pip install -r companion/requirements.txt`, then run
-`companion\run_buddy.bat` (or add a shortcut to it in `shell:startup`).
+`companion\run_buddy.bat` — or nothing at all: `start_buddy_hidden.vbs`
+is installed in `shell:startup`, so it launches silently at login
+(log: `companion\buddy.log`).
 It auto-detects the board on USB (Espressif VID) and falls back to
 Bluetooth LE ("ClaudeBuddy", Nordic UART service) when unplugged — with a
 30 s heartbeat that forces a reconnect if the link goes silent.
