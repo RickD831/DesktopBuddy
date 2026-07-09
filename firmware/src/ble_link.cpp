@@ -30,7 +30,7 @@ class BuddyRxCallbacks : public NimBLECharacteristicCallbacks {
         NimBLEAttValue v = c->getValue();
         xSemaphoreTake(rx_mutex, portMAX_DELAY);
         rx_accum.append((const char *)v.data(), v.length());
-        if (rx_accum.size() > 4096) rx_accum.clear();  /* runaway guard */
+        if (rx_accum.size() > 65536) rx_accum.clear();  /* runaway guard */
         xSemaphoreGive(rx_mutex);
     }
 };

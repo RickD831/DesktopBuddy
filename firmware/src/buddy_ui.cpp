@@ -68,7 +68,28 @@ static lv_obj_t *batt_lbl, *zen_batt_lbl, *use_batt_lbl, *stats_batt_lbl;
 
 /* PC stats screen + context gauge on the buddy screen */
 static lv_obj_t *scr_stats;
-static lv_obj_t *ctx_bar, *ctx_lbl, *ctx_txt_lbl;
+static lv_obj_t *ctx_bar, *ctx_lbl;
+
+/* now-playing screen */
+static lv_obj_t *scr_media;
+static lv_obj_t *med_title_lbl, *med_artist_lbl, *med_app_lbl;
+static lv_obj_t *med_bar, *med_time_lbl, *med_batt_lbl;
+static lv_obj_t *med_btn_prev, *med_btn_play, *med_btn_next, *med_play_icon;
+static lv_obj_t *med_line_lbl;          /* now-playing line on the buddy screen */
+static lv_obj_t *dancer;                /* solo dancer with headphones */
+static lv_obj_t *dc_eye_l, *dc_eye_r;   /* its eyes (for blinking) */
+static void (*media_cmd_cb)(const char *cmd) = NULL;
+static int med_pos = 0, med_dur = 0, med_playing = -1;
+static char med_last_title[64] = "";
+static bool art_new_track = false;      /* interlude the next completed art */
+
+/* album art (pixels live in main.cpp's PSRAM buffer) */
+static lv_obj_t *art_img_buddy, *art_img_media;
+static lv_image_dsc_t art_dsc;
+static bool art_valid = false;
+
+static void buddy_gesture_cb(lv_event_t *e);
+static void art_peek(uint32_t ms);
 
 /* notification overlay */
 static lv_obj_t *toast, *toast_icon, *toast_lbl;
@@ -262,8 +283,8 @@ static void face_long_press_cb(lv_event_t *e)
 static void screen_click_cb(lv_event_t *e)
 {
     (void)e;
-    cur_screen = (cur_screen + 1) % 4;
-    lv_obj_t *screens[4] = { scr_buddy, scr_zen, scr_use, scr_stats };
+    cur_screen = (cur_screen + 1) % 5;
+    lv_obj_t *screens[5] = { scr_buddy, scr_zen, scr_use, scr_stats, scr_media };
     lv_obj_t *next = screens[cur_screen];
     lv_screen_load_anim(next, LV_SCR_LOAD_ANIM_FADE_IN, 180, 0, false);
     /* touching the screen also wakes a sleeping buddy's backlight briefly */
@@ -468,19 +489,12 @@ static void build_buddy_screen(void)
     proj_lbl = make_label(scr_buddy, &lv_font_montserrat_12, C_DIM, "");
     lv_obj_set_pos(proj_lbl, FACE_W + 18, 70);
 
-    /* claude usage mini-gauge */
-    use_mini_bar = lv_bar_create(scr_buddy);
-    lv_obj_set_size(use_mini_bar, 235, 8);
-    lv_obj_set_pos(use_mini_bar, FACE_W + 18, 128);
-    lv_bar_set_range(use_mini_bar, 0, 100);
-    lv_obj_set_style_bg_color(use_mini_bar, C_BAR_BG, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(use_mini_bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(use_mini_bar, 4, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(use_mini_bar, C_HAPPY, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(use_mini_bar, 4, LV_PART_INDICATOR);
-
-    use_mini_lbl = make_label(scr_buddy, &lv_font_montserrat_12, C_DIM, "usage --");
-    lv_obj_set_pos(use_mini_lbl, FACE_W + 18, 142);
+    /* now-playing line (shown while music plays) */
+    med_line_lbl = make_label(scr_buddy, &lv_font_montserrat_12, C_WORKING, "");
+    lv_obj_set_width(med_line_lbl, 235);
+    lv_label_set_long_mode(med_line_lbl, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_pos(med_line_lbl, FACE_W + 18, 126);
+    lv_obj_add_flag(med_line_lbl, LV_OBJ_FLAG_HIDDEN);
 
     /* working dots */
     for (int i = 0; i < 3; i++) {
@@ -514,21 +528,41 @@ static void build_buddy_screen(void)
     batt_lbl = make_label(scr_buddy, &lv_font_montserrat_12, C_DIM, "");
     lv_obj_align(batt_lbl, LV_ALIGN_TOP_RIGHT, -16, 62);
 
-    /* context-window gauge for the active session */
+
+    /* right column: context gauge with the usage gauge tucked under it */
     ctx_lbl = make_label(scr_buddy, &lv_font_montserrat_12, C_TEXT, "context  --%");
-    lv_obj_set_pos(ctx_lbl, SCR_W - 166, 88);
+    lv_obj_set_pos(ctx_lbl, SCR_W - 166, 82);
     ctx_bar = lv_bar_create(scr_buddy);
-    lv_obj_set_size(ctx_bar, 150, 10);
-    lv_obj_set_pos(ctx_bar, SCR_W - 166, 106);
+    lv_obj_set_size(ctx_bar, 150, 8);
+    lv_obj_set_pos(ctx_bar, SCR_W - 166, 100);
     lv_bar_set_range(ctx_bar, 0, 100);
     lv_obj_set_style_bg_color(ctx_bar, C_BAR_BG, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(ctx_bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_radius(ctx_bar, 5, LV_PART_MAIN);
+    lv_obj_set_style_radius(ctx_bar, 4, LV_PART_MAIN);
     lv_obj_set_style_bg_color(ctx_bar, C_HAPPY, LV_PART_INDICATOR);
-    lv_obj_set_style_radius(ctx_bar, 5, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(ctx_bar, 4, LV_PART_INDICATOR);
 
-    ctx_txt_lbl = make_label(scr_buddy, &lv_font_montserrat_12, C_DIM, "");
-    lv_obj_set_pos(ctx_txt_lbl, SCR_W - 166, 124);
+    use_mini_lbl = make_label(scr_buddy, &lv_font_montserrat_12, C_DIM, "usage --");
+    lv_obj_set_pos(use_mini_lbl, SCR_W - 166, 118);
+    use_mini_bar = lv_bar_create(scr_buddy);
+    lv_obj_set_size(use_mini_bar, 150, 8);
+    lv_obj_set_pos(use_mini_bar, SCR_W - 166, 136);
+    lv_bar_set_range(use_mini_bar, 0, 100);
+    lv_obj_set_style_bg_color(use_mini_bar, C_BAR_BG, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(use_mini_bar, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(use_mini_bar, 4, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(use_mini_bar, C_HAPPY, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(use_mini_bar, 4, LV_PART_INDICATOR);
+
+    /* album art peek: shown over the face on new tracks / swipe down */
+    art_img_buddy = lv_image_create(scr_buddy);
+    lv_obj_set_pos(art_img_buddy, 40, 26);
+    lv_obj_add_flag(art_img_buddy, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(art_img_buddy, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_radius(art_img_buddy, 12, 0);
+    lv_obj_set_style_clip_corner(art_img_buddy, true, 0);
+
+    lv_obj_add_event_cb(scr_buddy, buddy_gesture_cb, LV_EVENT_GESTURE, NULL);
 }
 
 static void build_stats_screen(void)
@@ -639,7 +673,7 @@ void buddy_set_usage(int pct, const char *reset, const char *block, const char *
         lv_label_set_text(use_pct_lbl, buf);
         lv_obj_set_style_text_color(use_pct_lbl, c, 0);
         if (reset && reset[0])
-            snprintf(buf, sizeof(buf), "usage %d%%  ·  resets %s", pct, reset);
+            snprintf(buf, sizeof(buf), "usage %d%% - %s", pct, reset);
         else
             snprintf(buf, sizeof(buf), "usage %d%%", pct);
         lv_label_set_text(use_mini_lbl, buf);
@@ -677,6 +711,7 @@ void buddy_set_weekly(int all_pct, int model_pct, const char *reset)
 
 void buddy_set_context(int pct, const char *txt)
 {
+    (void)txt;   /* full breakdown lives on the usage screen */
     char buf[40];
     if (pct >= 0) {
         int shown = pct > 100 ? 100 : pct;
@@ -685,7 +720,6 @@ void buddy_set_context(int pct, const char *txt)
         snprintf(buf, sizeof(buf), "context  %d%%", pct);
         lv_label_set_text(ctx_lbl, buf);
     }
-    if (txt) lv_label_set_text(ctx_txt_lbl, txt);
 }
 
 void buddy_set_battery(int pct, bool charging, bool ble)
@@ -703,10 +737,358 @@ void buddy_set_battery(int pct, bool charging, bool ble)
              ble ? LV_SYMBOL_BLUETOOTH : LV_SYMBOL_USB);
     lv_color_t c = (!charging && pct <= 15) ? C_ERROR
                  : (!charging && pct <= 35) ? C_WAITING : C_DIM;
-    lv_obj_t *lbls[4] = { batt_lbl, zen_batt_lbl, use_batt_lbl, stats_batt_lbl };
-    for (int i = 0; i < 4; i++) {
+    lv_obj_t *lbls[5] = { batt_lbl, zen_batt_lbl, use_batt_lbl, stats_batt_lbl, med_batt_lbl };
+    for (int i = 0; i < 5; i++) {
         lv_label_set_text(lbls[i], buf);
         lv_obj_set_style_text_color(lbls[i], c, 0);
+    }
+}
+
+/* ---------- music motion: head bob + dancers + art peek ---------- */
+
+static void anim_tx_cb(void *obj, int32_t v) { lv_obj_set_style_translate_x((lv_obj_t *)obj, v, 0); }
+static void anim_ty_cb(void *obj, int32_t v) { lv_obj_set_style_translate_y((lv_obj_t *)obj, v, 0); }
+static void anim_rot_cb(void *obj, int32_t v) { lv_obj_set_style_transform_rotation((lv_obj_t *)obj, v, 0); }
+
+/* gentle head bob on the main screen while music plays and buddy is idle;
+   direction varies from bob to bob */
+static void bob_timer_cb(lv_timer_t *t)
+{
+    (void)t;
+    if (med_playing != 1 || (cur_mood != MOOD_IDLE && cur_mood != MOOD_HAPPY)) {
+        lv_obj_set_style_translate_x(face_cont, 0, 0);
+        lv_obj_set_style_translate_y(face_cont, 0, 0);
+        return;
+    }
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, face_cont);
+    lv_anim_set_exec_cb(&a, lv_rand(0, 1) ? anim_tx_cb : anim_ty_cb);
+    lv_anim_set_values(&a, -5, 5);
+    lv_anim_set_duration(&a, 420);
+    lv_anim_set_playback_duration(&a, 420);
+    lv_anim_set_repeat_count(&a, 3);
+    lv_anim_set_completed_cb(&a, [](lv_anim_t *an) {
+        lv_obj_set_style_translate_x((lv_obj_t *)an->var, 0, 0);
+        lv_obj_set_style_translate_y((lv_obj_t *)an->var, 0, 0);
+    });
+    lv_anim_start(&a);
+}
+
+/* the solo dancer: a little face in headphones that sways to the music */
+static void build_dancer(lv_obj_t *parent, int x, int y)
+{
+    lv_obj_t *d = make_box(parent);
+    dancer = d;
+    lv_obj_set_size(d, 84, 70);
+    lv_obj_set_pos(d, x, y);
+    lv_obj_set_style_bg_color(d, C_PANEL, 0);
+    lv_obj_set_style_bg_opa(d, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(d, 16, 0);
+    lv_obj_set_style_border_width(d, 1, 0);
+    lv_obj_set_style_border_color(d, C_BAR_BG, 0);
+    lv_obj_set_style_transform_pivot_x(d, 42, 0);
+    lv_obj_set_style_transform_pivot_y(d, 35, 0);
+
+    /* headphones: band over the top + a pad on each side */
+    lv_obj_t *band = lv_arc_create(d);
+    lv_obj_set_size(band, 62, 62);
+    lv_arc_set_bg_angles(band, 200, 340);
+    lv_obj_set_style_arc_width(band, 5, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(band, C_WORKING, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(band, true, LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(band, LV_OPA_TRANSP, LV_PART_INDICATOR);
+    lv_obj_remove_style(band, NULL, LV_PART_KNOB);
+    lv_obj_clear_flag(band, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_align(band, LV_ALIGN_TOP_MID, 0, 2);
+
+    for (int i = 0; i < 2; i++) {
+        lv_obj_t *pad = make_box(d);
+        lv_obj_set_size(pad, 10, 20);
+        lv_obj_set_style_bg_color(pad, C_WORKING, 0);
+        lv_obj_set_style_bg_opa(pad, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(pad, 4, 0);
+        lv_obj_align(pad, i ? LV_ALIGN_RIGHT_MID : LV_ALIGN_LEFT_MID,
+                     i ? -4 : 4, -2);
+    }
+
+    dc_eye_l = make_box(d);
+    dc_eye_r = make_box(d);
+    lv_obj_t *eyes[2] = { dc_eye_l, dc_eye_r };
+    for (int i = 0; i < 2; i++) {
+        lv_obj_set_size(eyes[i], 9, 16);
+        lv_obj_set_style_bg_color(eyes[i], C_EYE, 0);
+        lv_obj_set_style_bg_opa(eyes[i], LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(eyes[i], LV_RADIUS_CIRCLE, 0);
+        lv_obj_align(eyes[i], LV_ALIGN_CENTER, i ? 13 : -13, -6);
+    }
+
+    lv_obj_t *smile = lv_arc_create(d);
+    lv_obj_set_size(smile, 26, 26);
+    lv_arc_set_bg_angles(smile, 30, 150);
+    lv_obj_set_style_arc_width(smile, 3, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(smile, C_EYE, LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(smile, LV_OPA_TRANSP, LV_PART_INDICATOR);
+    lv_obj_remove_style(smile, NULL, LV_PART_KNOB);
+    lv_obj_clear_flag(smile, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_align(smile, LV_ALIGN_CENTER, 0, 15);
+
+    /* easy sway, side to side */
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, d);
+    lv_anim_set_exec_cb(&a, anim_tx_cb);
+    lv_anim_set_values(&a, -10, 10);
+    lv_anim_set_duration(&a, 900);
+    lv_anim_set_playback_duration(&a, 900);
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_start(&a);
+
+    lv_obj_add_flag(d, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void dancer_blink_cb(lv_timer_t *t)
+{
+    if (lv_obj_has_flag(dancer, LV_OBJ_FLAG_HIDDEN)) return;
+    lv_obj_t *eyes[2] = { dc_eye_l, dc_eye_r };
+    for (int i = 0; i < 2; i++) {
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, eyes[i]);
+        lv_anim_set_exec_cb(&a, anim_height_cb);
+        lv_anim_set_values(&a, 16, 4);
+        lv_anim_set_duration(&a, 80);
+        lv_anim_set_playback_duration(&a, 90);
+        lv_anim_start(&a);
+    }
+    lv_timer_set_period(t, 2600 + lv_rand(0, 3200));
+}
+
+static void dancer_twirl_cb(lv_timer_t *t)
+{
+    if (lv_obj_has_flag(dancer, LV_OBJ_FLAG_HIDDEN)) return;
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, dancer);
+    lv_anim_set_exec_cb(&a, anim_rot_cb);
+    lv_anim_set_values(&a, 0, 3600);     /* one full spin */
+    lv_anim_set_duration(&a, 700);
+    lv_anim_set_completed_cb(&a, [](lv_anim_t *an) {
+        lv_obj_set_style_transform_rotation((lv_obj_t *)an->var, 0, 0);
+    });
+    lv_anim_start(&a);
+    lv_timer_set_period(t, 9000 + lv_rand(0, 9000));
+}
+
+static void dancers_set(bool on)
+{
+    if (on) lv_obj_clear_flag(dancer, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(dancer, LV_OBJ_FLAG_HIDDEN);
+}
+
+/* show the album art over the face for a moment */
+static void art_hide_cb(lv_timer_t *t)
+{
+    (void)t;
+    lv_obj_add_flag(art_img_buddy, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void art_peek(uint32_t ms)
+{
+    if (!art_valid) return;
+    lv_obj_clear_flag(art_img_buddy, LV_OBJ_FLAG_HIDDEN);
+    lv_timer_t *t = lv_timer_create(art_hide_cb, ms, NULL);
+    lv_timer_set_repeat_count(t, 1);
+}
+
+static void buddy_gesture_cb(lv_event_t *e)
+{
+    (void)e;
+    if (lv_indev_get_gesture_dir(lv_indev_active()) == LV_DIR_BOTTOM)
+        art_peek(2500);
+}
+
+void buddy_media_art_ready(const uint8_t *pixels, int w, int h)
+{
+    art_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    art_dsc.header.cf = LV_COLOR_FORMAT_RGB565;
+    art_dsc.header.w = w;
+    art_dsc.header.h = h;
+    art_dsc.header.stride = w * 2;
+    art_dsc.data_size = (uint32_t)(w * h * 2);
+    art_dsc.data = pixels;
+    lv_image_cache_drop(&art_dsc);
+    lv_image_set_src(art_img_buddy, &art_dsc);
+    lv_image_set_src(art_img_media, &art_dsc);
+    lv_obj_clear_flag(art_img_media, LV_OBJ_FLAG_HIDDEN);
+    art_valid = true;
+    if (art_new_track) {
+        art_new_track = false;
+        art_peek(2200);
+    }
+}
+
+static void media_btn_cb(lv_event_t *e)
+{
+    const char *cmd = (const char *)lv_event_get_user_data(e);
+    if (media_cmd_cb) media_cmd_cb(cmd);
+}
+
+static lv_obj_t *make_media_btn(const char *sym, const char *cmd, int x_ofs)
+{
+    lv_obj_t *btn = lv_button_create(scr_media);
+    lv_obj_set_size(btn, 64, 52);
+    lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, x_ofs, -12);
+    lv_obj_set_style_bg_color(btn, C_PANEL, 0);
+    lv_obj_set_style_bg_color(btn, C_BAR_BG, LV_STATE_PRESSED);
+    lv_obj_set_style_radius(btn, 12, 0);
+    lv_obj_set_style_border_width(btn, 1, 0);
+    lv_obj_set_style_border_color(btn, C_BAR_BG, 0);
+    lv_obj_set_style_shadow_width(btn, 0, 0);
+    lv_obj_add_event_cb(btn, media_btn_cb, LV_EVENT_CLICKED, (void *)cmd);
+    lv_obj_t *l = make_label(btn, &lv_font_montserrat_20, C_EYE, sym);
+    lv_obj_center(l);
+    return btn;
+}
+
+static void fmt_mmss(char *out, size_t n, int s)
+{
+    if (s < 0) s = 0;
+    snprintf(out, n, "%d:%02d", s / 60, s % 60);
+}
+
+static void media_refresh_progress(void)
+{
+    char a[16], b[16], buf[40];
+    fmt_mmss(a, sizeof(a), med_pos);
+    fmt_mmss(b, sizeof(b), med_dur);
+    snprintf(buf, sizeof(buf), "%s / %s", a, b);
+    lv_label_set_text(med_time_lbl, buf);
+    lv_bar_set_value(med_bar, (med_dur > 0) ? (med_pos * 100 / med_dur) : 0, LV_ANIM_OFF);
+}
+
+/* advance the progress bar locally so it moves smoothly between updates
+   (browsers report position only sporadically) */
+static void media_tick_cb(lv_timer_t *t)
+{
+    (void)t;
+    if (med_playing == 1 && med_dur > 0 && med_pos < med_dur) {
+        med_pos++;
+        media_refresh_progress();
+    }
+}
+
+static void build_media_screen(void)
+{
+    scr_media = make_screen();
+
+    /* album art, left */
+    art_img_media = lv_image_create(scr_media);
+    lv_obj_set_pos(art_img_media, 14, 12);
+    lv_obj_set_style_radius(art_img_media, 10, 0);
+    lv_obj_set_style_clip_corner(art_img_media, true, 0);
+    lv_obj_clear_flag(art_img_media, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(art_img_media, LV_OBJ_FLAG_HIDDEN);
+
+    /* track info, middle */
+    med_app_lbl = make_label(scr_media, &lv_font_montserrat_12, C_DIM, "now playing");
+    lv_obj_set_pos(med_app_lbl, 148, 12);
+
+    med_title_lbl = make_label(scr_media, &lv_font_montserrat_20, C_EYE, "nothing playing");
+    lv_obj_set_width(med_title_lbl, 290);
+    lv_label_set_long_mode(med_title_lbl, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_pos(med_title_lbl, 148, 38);
+
+    med_artist_lbl = make_label(scr_media, &lv_font_montserrat_14, C_TEXT, "");
+    lv_obj_set_width(med_artist_lbl, 290);
+    lv_label_set_long_mode(med_artist_lbl, LV_LABEL_LONG_DOT);
+    lv_obj_set_pos(med_artist_lbl, 148, 70);
+
+    med_time_lbl = make_label(scr_media, &lv_font_montserrat_12, C_DIM, "-:-- / -:--");
+    lv_obj_set_pos(med_time_lbl, 148, 100);
+
+    /* dance floor (behind the buttons; hidden unless playing) */
+    build_dancer(scr_media, 508, 16);
+    lv_timer_create(dancer_blink_cb, 3000, NULL);
+    lv_timer_create(dancer_twirl_cb, 11000, NULL);
+
+    /* transport buttons, on top of the dancers */
+    med_btn_prev = make_media_btn(LV_SYMBOL_PREV, "prev", 0);
+    med_btn_play = make_media_btn(LV_SYMBOL_PLAY, "play", 0);
+    med_btn_next = make_media_btn(LV_SYMBOL_NEXT, "next", 0);
+    lv_obj_align(med_btn_prev, LV_ALIGN_TOP_RIGHT, -170, 92);
+    lv_obj_align(med_btn_play, LV_ALIGN_TOP_RIGHT, -98, 92);
+    lv_obj_align(med_btn_next, LV_ALIGN_TOP_RIGHT, -26, 92);
+    med_play_icon = lv_obj_get_child(med_btn_play, 0);
+
+    /* progress bar along the very bottom */
+    med_bar = make_hbar(scr_media, 0);
+    lv_obj_set_size(med_bar, SCR_W - 48, 6);
+    lv_obj_align(med_bar, LV_ALIGN_BOTTOM_MID, 0, -8);
+    lv_obj_set_style_bg_color(med_bar, C_WORKING, LV_PART_INDICATOR);
+
+    med_batt_lbl = make_label(scr_media, &lv_font_montserrat_12, C_DIM, "");
+    lv_obj_align(med_batt_lbl, LV_ALIGN_TOP_RIGHT, -24, 8);
+
+    lv_timer_create(media_tick_cb, 1000, NULL);
+    lv_timer_create(bob_timer_cb, 3200, NULL);
+}
+
+void buddy_set_media_cmd_cb(void (*cb)(const char *cmd)) { media_cmd_cb = cb; }
+
+void buddy_set_media(const char *title, const char *artist, const char *app,
+                     int playing, int pos, int dur)
+{
+    static int med_last_reported = -1;
+    bool same_track = (title != NULL &&
+                       strncmp(med_last_title, title, sizeof(med_last_title) - 1) == 0);
+    med_playing = playing;
+    med_dur = dur;
+    /* Web players freeze their reported position while playing and only
+       refresh it on pause/seek. So: trust the local 1 s ticker, and accept
+       the player's position only when it reports a NEW value (or the track
+       changed) — a repeated value is stale, not a seek. */
+    if (!same_track) {
+        med_pos = pos;
+    } else if (pos != med_last_reported) {
+        if (pos > med_pos || (med_pos - pos) > 2) med_pos = pos;
+    }
+    med_last_reported = pos;
+
+    if (playing < 0 || title == NULL || title[0] == '\0') {
+        lv_label_set_text(med_title_lbl, "nothing playing");
+        lv_label_set_text(med_artist_lbl, "");
+        lv_label_set_text(med_app_lbl, "now playing");
+        lv_label_set_text(med_time_lbl, "-:-- / -:--");
+        lv_bar_set_value(med_bar, 0, LV_ANIM_OFF);
+        lv_obj_add_flag(med_line_lbl, LV_OBJ_FLAG_HIDDEN);
+        dancers_set(false);
+        med_last_title[0] = '\0';
+        return;
+    }
+    if (!same_track) {
+        strncpy(med_last_title, title, sizeof(med_last_title) - 1);
+        med_last_title[sizeof(med_last_title) - 1] = '\0';
+        art_new_track = true;   /* peek the art when it finishes arriving */
+    }
+    lv_label_set_text(med_title_lbl, title);
+    lv_label_set_text(med_artist_lbl, artist ? artist : "");
+    char buf[192];
+    snprintf(buf, sizeof(buf), "now playing  -  %s", app ? app : "");
+    lv_label_set_text(med_app_lbl, buf);
+    lv_label_set_text(med_play_icon, playing == 1 ? LV_SYMBOL_PAUSE : LV_SYMBOL_PLAY);
+    media_refresh_progress();
+
+    /* buddy-screen ticker + dance floor follow the play state */
+    if (playing == 1) {
+        snprintf(buf, sizeof(buf), LV_SYMBOL_AUDIO "  %s - %s", title,
+                 artist ? artist : "");
+        lv_label_set_text(med_line_lbl, buf);
+        lv_obj_clear_flag(med_line_lbl, LV_OBJ_FLAG_HIDDEN);
+        dancers_set(true);
+    } else {
+        lv_obj_add_flag(med_line_lbl, LV_OBJ_FLAG_HIDDEN);
+        dancers_set(false);
     }
 }
 
@@ -739,6 +1121,7 @@ void buddy_ui_init(void)
     build_zen_screen();
     build_usage_screen();
     build_stats_screen();
+    build_media_screen();
     build_toast();
 
     lv_timer_create(blink_timer_cb, 3000, NULL);

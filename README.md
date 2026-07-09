@@ -17,14 +17,19 @@ Bluetooth LE (battery powered).
 
 ## Screens (tap to cycle)
 
-1. **Buddy** — animated face + Claude status + clock/date/battery +
-   context-window gauge for the most recently active session
+1. **Buddy** — animated face + Claude status + clock/date/battery + context
+   and usage gauges; a ♪ ticker with the current track while music plays
 2. **Zen clock** — big clock
 3. **Claude usage** — official numbers from Anthropic's usage API:
    5-hour block, weekly all-models, weekly current-model, with reset times
 4. **PC stats** — CPU and RAM
+5. **Now playing** — album art, track/artist, smooth progress bar, working
+   ⏮ ⏯ ⏭ buttons (controls Spotify, YouTube, anything with a Windows media
+   card), and a headphoned buddy that sways, blinks and twirls to the music
 
-Long-press the face to pet the buddy.
+Long-press the face to pet the buddy. **Swipe down** on the buddy screen to
+peek the album art (it also peeks automatically on every track change).
+While music plays and the buddy is idle, it bobs its head along.
 
 ## Moods
 
@@ -77,6 +82,7 @@ USB/BLE link show top-right on every screen.
 | Context-window gauge | Last assistant turn's token usage in the newest transcript (`~/.claude/projects/**/*.jsonl`); window 1M for Fable, 200k otherwise |
 | Token totals / fallback gauge | Transcript parsing (5-hour blocks; limit auto-estimated, override in `companion/buddy_config.json`: `{"block_limit_tokens": N}`) |
 | Daily cost | Claude Code OpenTelemetry → companion's OTLP listener on `127.0.0.1:4318` (env vars in `~/.claude/settings.json`) |
+| Now playing + controls | Windows system media API (SMTC, `winrt` packages) — any app with a media card, no service API keys. Position is extrapolated from the player's last report (web players freeze theirs). Album art: thumbnail → 120×120 RGB565, streamed in paced base64 chunks |
 
 **Secrets:** nothing sensitive lives in this folder. OAuth tokens stay in
 `~/.claude/.credentials.json`; hook events in `~/.claude/`; the OTel
@@ -89,12 +95,17 @@ listener binds to localhost only. `buddy.log` (activity text) is gitignored.
  "claude":"working","head":"Claude is working","msg":"Edit: main.cpp",
  "proj":"my-app","ctx":32,"ctxt":"323k / 1.0M",
  "use":{"pct":56,"rst":"4h 19m","blk":"38M tok","day":"41M tok · $12.40",
-        "w":38,"wrst":"Jul 12","wm":61}}
+        "w":38,"wrst":"Jul 12","wm":61},
+ "med":{"st":"playing","t":"Song","a":"Artist","app":"Spotify",
+        "pos":143,"dur":221}}
 {"t":"n","kind":"ok","msg":"Build finished"}      // toast: ok | err | info
+{"t":"art","w":120,"h":120,"seq":0,"n":60,"d":"<base64>"}  // album art chunks
 {"t":"ping"}                                       // → {"t":"pong","fw":"..."}
 ```
 `claude` states: `working`, `waiting`, `done`, `error`, `idle`, `sleep`.
-Buddy → PC: `hello` on boot, `pong`, `pet`. 30 s without frames → sleep mood.
+Buddy → PC: `hello` on boot, `pong`, `pet`, `mc` (media command:
+play/next/prev), `artok`/`artdrop` (art transfer receipts).
+30 s without frames → sleep mood.
 
 ## Troubleshooting
 
@@ -116,8 +127,6 @@ Buddy → PC: `hello` on boot, `pong`, `pet`. 30 s without frames → sleep mood
 
 ## Feature ideas / roadmap
 
-- Now-playing screen with touch controls (Spotify/YouTube/anything) via
-  Windows SMTC (`winsdk` package) — no per-service API keys needed
 - Battery-saver mood on BLE (dimmer backlight, slower updates)
 - Pomodoro timer screen (touch to start/stop)
 - Build/test results pushed as toasts from CI

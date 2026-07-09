@@ -44,6 +44,16 @@ void buddy_set_battery(int pct, bool charging, bool ble);
 /* Context window of the active session. pct -1 = unknown, txt e.g. "323k / 1.0M". */
 void buddy_set_context(int pct, const char *txt);
 
+/* Now playing. playing: 1 playing, 0 paused, -1 nothing. pos/dur in seconds. */
+void buddy_set_media(const char *title, const char *artist, const char *app,
+                     int playing, int pos, int dur);
+
+/* Fired from LVGL task when a transport button is tapped: "play"|"next"|"prev". */
+void buddy_set_media_cmd_cb(void (*cb)(const char *cmd));
+
+/* Album art arrived: RGB565 little-endian pixels (buffer must stay alive). */
+void buddy_media_art_ready(const unsigned char *pixels, int w, int h);
+
 /* Fired from LVGL task when the user long-presses the buddy's face. */
 void buddy_set_pet_cb(void (*cb)(void));
 

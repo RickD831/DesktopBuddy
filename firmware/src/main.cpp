@@ -12,12 +12,14 @@
 #include "ble_link.h"
 #include "power_latch.h"
 #include "lcd_bl_bsp/lcd_bl_pwm_bsp.h"
+#include "mbedtls/base64.h"
+#include "esp_heap_caps.h"
 
 #define FW_VERSION "1.0.0"
 #define COMPANION_TIMEOUT_MS 30000
 #define HAPPY_HOLD_MS 6000
 
-static char line_buf[512];
+static char line_buf[768];
 static size_t line_len = 0;
 static uint32_t last_rx_ms = 0;
 static bool companion_online = false;
@@ -26,6 +28,50 @@ static bool last_rx_was_ble = false;
 static uint32_t last_batt_ms = 0;
 
 #define BATT_ADC_PIN 4          /* ADC1_CH3, VBAT through a 1:3 divider */
+
+/* album art: 120x120 RGB565 streamed in base64 chunks of 510 raw bytes */
+#define ART_W 120
+#define ART_H 120
+#define ART_BYTES (ART_W * ART_H * 2)
+#define ART_RAW_CHUNK 480
+static uint8_t *art_buf = NULL;
+static uint32_t art_seen_mask_ok = 0;   /* count of chunks received in order */
+
+static void send_reply(const char *line);
+
+static void handle_art(JsonObject a)
+{
+    int w = a["w"] | 0, h = a["h"] | 0;
+    int seq = a["seq"] | -1, n = a["n"] | 0;
+    const char *d = a["d"] | "";
+    if (w != ART_W || h != ART_H || seq < 0 || n <= 0 || !d[0]) return;
+    if (art_buf == NULL) {
+        art_buf = (uint8_t *)heap_caps_malloc(ART_BYTES, MALLOC_CAP_SPIRAM);
+        if (art_buf == NULL) return;
+    }
+    size_t offset = (size_t)seq * ART_RAW_CHUNK;
+    if (offset >= ART_BYTES) return;
+    size_t out_len = 0;
+    if (mbedtls_base64_decode(art_buf + offset, ART_BYTES - offset, &out_len,
+                              (const unsigned char *)d, strlen(d)) != 0)
+        return;
+    if (seq == 0) art_seen_mask_ok = 0;
+    if ((int)art_seen_mask_ok == seq) art_seen_mask_ok++;
+    if (seq == n - 1) {
+        if ((int)art_seen_mask_ok == n) {
+            if (lvgl_port_lock(100)) {
+                buddy_media_art_ready(art_buf, ART_W, ART_H);
+                lvgl_port_unlock();
+            }
+            send_reply("{\"t\":\"artok\"}");
+        } else {
+            char buf[64];
+            snprintf(buf, sizeof(buf),
+                     "{\"t\":\"artdrop\",\"got\":%u,\"n\":%d}", art_seen_mask_ok, n);
+            send_reply(buf);
+        }
+    }
+}
 
 /* resting LiPo voltage (mV) -> percent, linear between curve points */
 static int batt_percent(int mv)
@@ -69,6 +115,13 @@ static void send_reply(const char *line)
 static void send_pet_event(void)
 {
     send_reply("{\"t\":\"pet\"}");
+}
+
+static void send_media_cmd(const char *cmd)
+{
+    char buf[48];
+    snprintf(buf, sizeof(buf), "{\"t\":\"mc\",\"cmd\":\"%s\"}", cmd);
+    send_reply(buf);
 }
 
 static buddy_mood_t mood_from_state(const char *s)
@@ -119,6 +172,17 @@ static void handle_line(const char *line)
             }
             buddy_set_context(doc["ctx"] | -1,
                               doc["ctxt"] | (const char *)nullptr);
+            if (doc["med"].is<JsonObject>()) {
+                JsonObject m = doc["med"];
+                const char *st = m["st"] | "";
+                buddy_set_media(m["t"] | (const char *)nullptr,
+                                m["a"] | (const char *)nullptr,
+                                m["app"] | (const char *)nullptr,
+                                !strcmp(st, "playing") ? 1 : 0,
+                                m["pos"] | 0, m["dur"] | 0);
+            } else {
+                buddy_set_media(nullptr, nullptr, nullptr, -1, 0, 0);
+            }
             lvgl_port_unlock();
         }
     } else if (!strcmp(type, "n")) { /* notification toast */
@@ -131,6 +195,8 @@ static void handle_line(const char *line)
             buddy_notify(k, msg);
             lvgl_port_unlock();
         }
+    } else if (!strcmp(type, "art")) {
+        handle_art(doc.as<JsonObject>());
     } else if (!strcmp(type, "ping")) {
         send_reply("{\"t\":\"pong\",\"fw\":\"" FW_VERSION "\"}");
     }
@@ -138,6 +204,7 @@ static void handle_line(const char *line)
 
 void setup()
 {
+    Serial.setRxBufferSize(16384);   /* album-art bursts overflow the 256B default */
     Serial.begin(115200);
     i2c_master_Init();
     power_latch_init();   /* grab battery power before the PWR button is released */
@@ -147,6 +214,7 @@ void setup()
     if (lvgl_port_lock(-1)) {
         buddy_ui_init();
         buddy_set_pet_cb(send_pet_event);
+        buddy_set_media_cmd_cb(send_media_cmd);
         lvgl_port_unlock();
     }
     ble_link_init();
@@ -198,5 +266,5 @@ void loop()
         }
     }
 
-    delay(10);
+    delay(5);
 }

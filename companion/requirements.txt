@@ -1,3 +1,8 @@
 pyserial>=3.5
 psutil>=5.9
 bleak>=0.22
+winrt-runtime
+winrt-Windows.Media.Control
+winrt-Windows.Foundation
+winrt-Windows.Storage.Streams
+pillow

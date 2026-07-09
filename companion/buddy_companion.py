@@ -516,6 +516,151 @@ class UsageAPI:
         return out
 
 
+class MediaWatcher:
+    """Now-playing info + transport control via Windows' system media API
+    (SMTC) — sees anything that shows in the volume-flyout media card:
+    Spotify, YouTube in a browser, VLC, etc. No per-service API keys."""
+
+    APP_NAMES = {"spotify": "Spotify", "chrome": "Chrome", "msedge": "Edge",
+                 "edge": "Edge", "firefox": "Firefox", "vlc": "VLC",
+                 "apple": "Apple Music"}
+
+    ART_SIZE = 120
+
+    def __init__(self) -> None:
+        import asyncio
+        import threading
+        self._asyncio = asyncio
+        self._lock = threading.Lock()
+        self._snap: dict | None = None
+        self._session = None
+        self._art: bytes | None = None      # RGB565-LE pixels for current track
+        self._art_key = ""
+        self._loop = asyncio.new_event_loop()
+        threading.Thread(target=self._thread_main, daemon=True).start()
+
+    def _thread_main(self) -> None:
+        self._asyncio.set_event_loop(self._loop)
+        try:
+            self._loop.run_until_complete(self._poll_forever())
+        except Exception as e:
+            print(f"media watcher stopped: {e!r}")
+
+    def _app_name(self, aumid: str) -> str:
+        low = (aumid or "").lower()
+        for key, name in self.APP_NAMES.items():
+            if key in low:
+                return name
+        return aumid or ""
+
+    async def _poll_forever(self) -> None:
+        from winrt.windows.media.control import (
+            GlobalSystemMediaTransportControlsSessionManager as Manager,
+        )
+        mgr = await Manager.request_async()
+        while True:
+            snap = None
+            try:
+                s = mgr.get_current_session()
+                if s is not None:
+                    info = await s.try_get_media_properties_async()
+                    status = int(s.get_playback_info().playback_status)
+                    tl = s.get_timeline_properties()
+                    title = (info.title or "").strip()
+                    if status in (4, 5) and title:   # 4 playing, 5 paused
+                        pos = tl.position.total_seconds()
+                        dur = tl.end_time.total_seconds()
+                        # players freeze their reported position; extrapolate
+                        # from when they last updated it to get the live value
+                        if status == 4:
+                            try:
+                                from datetime import datetime, timezone
+                                lu = tl.last_updated_time
+                                elapsed = (datetime.now(timezone.utc)
+                                           - lu).total_seconds()
+                                if 0 <= elapsed < 3600:
+                                    pos += elapsed
+                            except (AttributeError, TypeError, OSError):
+                                pass
+                        if dur > 0:
+                            pos = min(pos, dur)
+                        snap = {
+                            "t": title[:60],
+                            "a": (info.artist or "")[:40],
+                            "app": self._app_name(s.source_app_user_model_id),
+                            "st": "playing" if status == 4 else "paused",
+                            "pos": int(pos),
+                            "dur": int(dur),
+                        }
+                        key = f"{snap['t']}|{snap['a']}"
+                        if key != self._art_key:
+                            art = await self._fetch_art(info)
+                            with self._lock:
+                                self._art_key = key
+                                self._art = art
+                self._session = s
+            except Exception:
+                self._session = None
+            with self._lock:
+                self._snap = snap
+            await self._asyncio.sleep(2)
+
+    async def _fetch_art(self, info) -> bytes | None:
+        """Album thumbnail -> 120x120 RGB565 little-endian raw pixels."""
+        try:
+            import io
+            from PIL import Image
+            from winrt.windows.storage.streams import Buffer, InputStreamOptions
+            ref = info.thumbnail
+            if ref is None:
+                return None
+            stream = await ref.open_read_async()
+            size = stream.size
+            if not size or size > 4_000_000:
+                return None
+            buf = Buffer(size)
+            await stream.read_async(buf, size, InputStreamOptions.READ_AHEAD)
+            img = Image.open(io.BytesIO(bytes(memoryview(buf))))
+            img = img.convert("RGB").resize((self.ART_SIZE, self.ART_SIZE))
+            rgb = img.tobytes()
+            out = bytearray(self.ART_SIZE * self.ART_SIZE * 2)
+            for p in range(0, len(rgb), 3):
+                v = ((rgb[p] >> 3) << 11) | ((rgb[p + 1] >> 2) << 5) | (rgb[p + 2] >> 3)
+                o = (p // 3) * 2
+                out[o] = v & 0xFF
+                out[o + 1] = v >> 8
+            return bytes(out)
+        except Exception as e:
+            print(f"album art fetch failed: {e!r}")
+            return None
+
+    def snapshot(self) -> dict | None:
+        with self._lock:
+            return dict(self._snap) if self._snap else None
+
+    def art(self) -> tuple[str, bytes | None]:
+        """(track key, pixels) — pixels for the current track, or None."""
+        with self._lock:
+            return self._art_key, self._art
+
+    def command(self, cmd: str) -> None:
+        self._asyncio.run_coroutine_threadsafe(self._do_command(cmd), self._loop)
+
+    async def _do_command(self, cmd: str) -> None:
+        s = self._session
+        if s is None:
+            return
+        try:
+            if cmd == "play":
+                await s.try_toggle_play_pause_async()
+            elif cmd == "next":
+                await s.try_skip_next_async()
+            elif cmd == "prev":
+                await s.try_skip_previous_async()
+        except Exception as e:
+            print(f"media command {cmd} failed: {e!r}")
+
+
 class OtelReceiver:
     """Tiny OTLP/HTTP (json) listener for Claude Code's built-in telemetry.
 
@@ -768,7 +913,8 @@ HEADLINES = {
 }
 
 
-def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None) -> None:
+def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None,
+        media: "MediaWatcher | None" = None) -> None:
     watcher = ClaudeWatcher()
     usage_api = usage_api or UsageAPI()
     psutil.cpu_percent(interval=None)  # prime the counter
@@ -778,6 +924,8 @@ def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None) -> 
     last_pct = 0
     last_heard = time.time()
     last_ping = 0.0
+    last_art_key = ""
+    ART_RAW_CHUNK = 480
     try:
         while True:
             state, msg, proj = watcher.status()
@@ -801,7 +949,29 @@ def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None) -> 
             ctx = watcher.context()
             if ctx:
                 frame["ctx"], frame["ctxt"] = ctx
+            if media:
+                m = media.snapshot()
+                if m:
+                    frame["med"] = m
             transport.write_line(json.dumps(frame))
+
+            # stream album art once per track change
+            if media:
+                key, art = media.art()
+                if art and key != last_art_key:
+                    last_art_key = key
+                    import base64
+                    n = (len(art) + ART_RAW_CHUNK - 1) // ART_RAW_CHUNK
+                    for i in range(n):
+                        chunk = art[i * ART_RAW_CHUNK:(i + 1) * ART_RAW_CHUNK]
+                        transport.write_line(json.dumps(
+                            {"t": "art", "w": media.ART_SIZE, "h": media.ART_SIZE,
+                             "seq": i, "n": n,
+                             "d": base64.b64encode(chunk).decode()}))
+                        time.sleep(0.015)   # pace the burst so the device keeps up
+                    print(f"[{now:%H:%M:%S}] sent album art ({n} chunks)")
+                elif key != last_art_key:
+                    last_art_key = key   # track changed but no art available
 
             # warn when crossing usage thresholds
             for threshold, kind in ((80, "info"), (95, "err")):
@@ -834,7 +1004,15 @@ def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None) -> 
                 except json.JSONDecodeError:
                     continue
                 last_heard = time.time()
-                if ev.get("t") == "pet":
+                if ev.get("t") == "mc" and media:
+                    media.command(str(ev.get("cmd", "")))
+                    print(f"[{now:%H:%M:%S}] media: {ev.get('cmd')}")
+                elif ev.get("t") == "artok":
+                    print(f"[{now:%H:%M:%S}] buddy: album art displayed")
+                elif ev.get("t") == "artdrop":
+                    print(f"[{now:%H:%M:%S}] buddy: art incomplete "
+                          f"({ev.get('got')}/{ev.get('n')} chunks)")
+                elif ev.get("t") == "pet":
                     print(f"[{now:%H:%M:%S}] you petted the buddy \\(^-^)/")
                 elif ev.get("t") == "hello":
                     print(f"[{now:%H:%M:%S}] buddy firmware {ev.get('fw')} says hello")
@@ -855,6 +1033,13 @@ def main() -> None:
     otel = OtelReceiver()
     usage.day_cost = otel.day_cost
     usage_api = UsageAPI()
+    try:
+        media = MediaWatcher()
+        print("media watcher active (Windows SMTC)")
+    except Exception as e:
+        media = None
+        print(f"media watcher unavailable: {e!r} (pip install winrt-runtime "
+              "winrt-Windows.Media.Control winrt-Windows.Foundation)")
     print(f"usage right now: {usage.snapshot()}")
 
     while True:
@@ -865,7 +1050,7 @@ def main() -> None:
                 print("no buddy found on USB or BLE (retrying in 5s)")
                 time.sleep(5)
                 continue
-            run(transport, usage, usage_api)
+            run(transport, usage, usage_api, media)
         except KeyboardInterrupt:
             print("\nbye!")
             return
