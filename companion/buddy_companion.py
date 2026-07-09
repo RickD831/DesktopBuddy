@@ -58,7 +58,7 @@ class SerialTransport:
         self.name = f"USB {port}"
         self._ser = serial.Serial(port, 115200, timeout=0, write_timeout=2)
 
-    def write_line(self, line: str) -> None:
+    def write_line(self, line: str, reliable: bool = False) -> None:
         self._ser.write((line + "\n").encode())
 
     def read_text(self) -> str:
@@ -120,7 +120,9 @@ class BleTransport:
         with self._rx_lock:
             self._rx_buf += data.decode("utf-8", errors="replace")
 
-    def write_line(self, line: str) -> None:
+    def write_line(self, line: str, reliable: bool = False) -> None:
+        """reliable=True uses acknowledged writes — BLE may silently drop
+        write-without-response packets under load (album art bursts)."""
         if not self._client.is_connected:
             raise OSError("BLE disconnected")
         data = (line + "\n").encode()
@@ -130,10 +132,10 @@ class BleTransport:
         async def send():
             for i in range(0, len(data), chunk):
                 await self._client.write_gatt_char(NUS_RX, data[i:i + chunk],
-                                                   response=False)
+                                                   response=reliable)
 
         fut = self._asyncio.run_coroutine_threadsafe(send(), self._loop)
-        fut.result(timeout=10)
+        fut.result(timeout=15)
 
     def read_text(self) -> str:
         with self._rx_lock:
@@ -925,7 +927,20 @@ def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None,
     last_heard = time.time()
     last_ping = 0.0
     last_art_key = ""
+    art_attempts = 0
     ART_RAW_CHUNK = 480
+
+    def send_art(art) -> None:
+        import base64
+        n = (len(art) + ART_RAW_CHUNK - 1) // ART_RAW_CHUNK
+        for i in range(n):
+            chunk = art[i * ART_RAW_CHUNK:(i + 1) * ART_RAW_CHUNK]
+            transport.write_line(json.dumps(
+                {"t": "art", "w": media.ART_SIZE, "h": media.ART_SIZE,
+                 "seq": i, "n": n, "d": base64.b64encode(chunk).decode()}),
+                reliable=True)
+            time.sleep(0.01)
+        print(f"[{datetime.now():%H:%M:%S}] sent album art ({n} chunks)")
     try:
         while True:
             state, msg, proj = watcher.status()
@@ -958,20 +973,12 @@ def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None,
             # stream album art once per track change
             if media:
                 key, art = media.art()
-                if art and key != last_art_key:
+                if key != last_art_key:
                     last_art_key = key
-                    import base64
-                    n = (len(art) + ART_RAW_CHUNK - 1) // ART_RAW_CHUNK
-                    for i in range(n):
-                        chunk = art[i * ART_RAW_CHUNK:(i + 1) * ART_RAW_CHUNK]
-                        transport.write_line(json.dumps(
-                            {"t": "art", "w": media.ART_SIZE, "h": media.ART_SIZE,
-                             "seq": i, "n": n,
-                             "d": base64.b64encode(chunk).decode()}))
-                        time.sleep(0.015)   # pace the burst so the device keeps up
-                    print(f"[{now:%H:%M:%S}] sent album art ({n} chunks)")
-                elif key != last_art_key:
-                    last_art_key = key   # track changed but no art available
+                    art_attempts = 0
+                    if art:
+                        art_attempts = 1
+                        send_art(art)
 
             # warn when crossing usage thresholds
             for threshold, kind in ((80, "info"), (95, "err")):
@@ -1012,6 +1019,13 @@ def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None,
                 elif ev.get("t") == "artdrop":
                     print(f"[{now:%H:%M:%S}] buddy: art incomplete "
                           f"({ev.get('got')}/{ev.get('n')} chunks)")
+                    if media and art_attempts < 3:
+                        _, art = media.art()
+                        if art:
+                            art_attempts += 1
+                            print(f"[{now:%H:%M:%S}] resending art "
+                                  f"(attempt {art_attempts})")
+                            send_art(art)
                 elif ev.get("t") == "pet":
                     print(f"[{now:%H:%M:%S}] you petted the buddy \\(^-^)/")
                 elif ev.get("t") == "hello":
