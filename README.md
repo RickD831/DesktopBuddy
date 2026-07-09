@@ -114,6 +114,8 @@ Buddy → PC: `hello` on boot, `pong`, `pet`. 30 s without frames → sleep mood
 
 ## Feature ideas / roadmap
 
+- Now-playing screen with touch controls (Spotify/YouTube/anything) via
+  Windows SMTC (`winsdk` package) — no per-service API keys needed
 - Battery-saver mood on BLE (dimmer backlight, slower updates)
 - Pomodoro timer screen (touch to start/stop)
 - Build/test results pushed as toasts from CI
