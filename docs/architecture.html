@@ -191,19 +191,25 @@ to the display over whichever link is available.</p>
   <text x="301" y="267" fill="var(--ink)" font-size="12">OpenTelemetry push</text>
   <text x="301" y="284" fill="var(--dim)" font-size="10">exact cost, every 10 s</text>
 
+  <rect x="285" y="306" width="180" height="46" rx="8" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="301" y="325" fill="var(--ink)" font-size="12">system media (SMTC)</text>
+  <text x="301" y="342" fill="var(--dim)" font-size="10">Spotify / YouTube / anything</text>
+
   <!-- claude code feeds the three -->
   <path d="M 375 110 L 375 132" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
   <path d="M 350 110 C 330 118 325 170 337 190" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
   <path d="M 330 110 C 300 130 295 215 320 248" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
+  <path d="M 465 329 C 495 329 500 290 510 272" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
 
   <!-- companion -->
   <rect x="510" y="120" width="155" height="160" rx="12" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
   <text x="530" y="147" fill="var(--accent)" font-size="14">companion</text>
   <text x="530" y="164" fill="var(--dim)" font-size="10.5">buddy_companion.py</text>
-  <text x="530" y="192" fill="var(--ink)" font-size="10.5">· watches sources</text>
-  <text x="530" y="210" fill="var(--ink)" font-size="10.5">· builds status frame</text>
-  <text x="530" y="228" fill="var(--ink)" font-size="10.5">· 2 s cadence</text>
-  <text x="530" y="246" fill="var(--ink)" font-size="10.5">· heartbeat + reconnect</text>
+  <text x="530" y="190" fill="var(--ink)" font-size="10.5">· watches sources</text>
+  <text x="530" y="207" fill="var(--ink)" font-size="10.5">· builds status frame, 2 s</text>
+  <text x="530" y="224" fill="var(--ink)" font-size="10.5">· streams album art</text>
+  <text x="530" y="241" fill="var(--ink)" font-size="10.5">· relays media commands</text>
+  <text x="530" y="258" fill="var(--ink)" font-size="10.5">· heartbeat + reconnect</text>
 
   <!-- sources -> companion -->
   <path d="M 225 78 C 400 78 430 150 510 158" stroke="var(--green)" fill="none" marker-end="url(#arrg)"/>
@@ -281,6 +287,11 @@ disappears, the others keep working.</p>
     <td>Claude Code pushes metrics to the companion's listener on <code>localhost:4318</code></td>
     <td>Today's dollar cost on the usage screen</td>
   </tr>
+  <tr>
+    <td>System media (SMTC)</td>
+    <td>Windows' media API — whatever shows in the volume-flyout card. Position is extrapolated past web players' frozen reports; album thumbnails converted to the display's pixel format and streamed in paced chunks</td>
+    <td>Now-playing screen (art, track, progress, working ⏮⏯⏭), the ♪ ticker, head-bob, the dancer, art peeks on track change</td>
+  </tr>
 </table>
 </div>
 
@@ -298,51 +309,68 @@ and Bluetooth. The firmware never talks to the network; it just renders what it'
            <span class="k">"day"</span>:<span class="v">"41M tok · $12.40"</span> },
   <span class="k">"cpu"</span>:<span class="v">31</span>, <span class="k">"ram"</span>:<span class="v">62</span>, <span class="k">"clk"</span>:<span class="v">"14:32"</span>, <span class="k">"date"</span>:<span class="v">"Wed Jul 09"</span> }
 
-<span class="cm">// buddy → PC:  {"t":"hello"} on boot · {"t":"pong"} to pings · {"t":"pet"} when petted</span>
-<span class="cm">// 30 s of silence → companion reconnects · 30 s without frames → buddy goes to sleep</span></pre>
+  <span class="k">"med"</span>: { <span class="k">"st"</span>:<span class="v">"playing"</span>, <span class="k">"t"</span>:<span class="v">"Real Love Baby"</span>,       <span class="cm">// now playing</span>
+           <span class="k">"a"</span>:<span class="v">"Father John Misty"</span>, <span class="k">"pos"</span>:<span class="v">143</span>, <span class="k">"dur"</span>:<span class="v">221</span> } }
 
-<h2>The four screens</h2>
-<p class="sub">Tap anywhere (outside the face) to cycle. Battery, charge state and the
-USB/Bluetooth link icon ride along in the corner of every screen.</p>
+<span class="cm">// album art rides separately: 60 paced chunks of base64 RGB565 pixels</span>
+{ <span class="k">"t"</span>:<span class="v">"art"</span>, <span class="k">"seq"</span>:<span class="v">0</span>, <span class="k">"n"</span>:<span class="v">60</span>, <span class="k">"d"</span>:<span class="v">"…"</span> }
+
+<span class="cm">// buddy → PC:  {"t":"hello"} on boot · {"t":"pong"} · {"t":"pet"} when petted</span>
+<span class="cm">//              {"t":"mc","cmd":"play|next|prev"} from the transport buttons</span>
+<span class="cm">// 30 s of silence → companion reconnects · 30 s without frames → buddy sleeps</span></pre>
+
+<h2>The five screens</h2>
+<p class="sub">Tap anywhere (outside the face and buttons) to cycle. Battery, charge state
+and the USB/Bluetooth link icon ride along in the corner of every screen.</p>
 <div class="diagram-wrap card">
-<svg viewBox="0 0 940 130" role="img" aria-label="Four screens: buddy, zen clock, claude usage, pc stats">
+<svg viewBox="0 0 940 128" role="img" aria-label="Five screens: buddy, zen clock, claude usage, pc stats, now playing">
   <!-- screen 1: buddy -->
-  <rect x="10" y="14" width="215" height="72" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
-  <rect x="24" y="30" width="9" height="20" rx="4.5" fill="var(--face-eye)"/>
-  <rect x="42" y="30" width="9" height="20" rx="4.5" fill="var(--face-eye)"/>
-  <path d="M 27 62 Q 38 70 49 62" stroke="var(--face-eye)" stroke-width="3" fill="none" stroke-linecap="round"/>
-  <rect x="70" y="30" width="80" height="7" rx="3" fill="var(--accent)"/>
-  <rect x="70" y="44" width="60" height="5" rx="2.5" fill="#8E8C98"/>
-  <rect x="70" y="66" width="70" height="5" rx="2.5" fill="var(--green)"/>
-  <text x="163" y="40" fill="var(--face-eye)" font-size="13">14:32</text>
-  <text x="163" y="56" fill="#8E8C98" font-size="7">context 32%</text>
-  <rect x="163" y="62" width="48" height="5" rx="2.5" fill="var(--green)"/>
-  <text x="10" y="108" fill="var(--ink)" font-size="12">1 · buddy</text>
-  <text x="10" y="123" fill="var(--dim)" font-size="10">face · status · context</text>
+  <rect x="6" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
+  <rect x="18" y="28" width="8" height="18" rx="4" fill="var(--face-eye)"/>
+  <rect x="33" y="28" width="8" height="18" rx="4" fill="var(--face-eye)"/>
+  <path d="M 20 56 Q 30 63 40 56" stroke="var(--face-eye)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <rect x="56" y="26" width="62" height="6" rx="3" fill="var(--accent)"/>
+  <rect x="56" y="38" width="46" height="4" rx="2" fill="#8E8C98"/>
+  <rect x="56" y="62" width="56" height="4" rx="2" fill="var(--accent)"/>
+  <text x="128" y="36" fill="var(--face-eye)" font-size="11">14:32</text>
+  <rect x="128" y="46" width="40" height="4" rx="2" fill="var(--green)"/>
+  <rect x="128" y="58" width="40" height="4" rx="2" fill="var(--amber)"/>
+  <text x="6" y="102" fill="var(--ink)" font-size="12">1 · buddy</text>
+  <text x="6" y="117" fill="var(--dim)" font-size="10">face · gauges · ♪ ticker</text>
 
   <!-- screen 2: zen -->
-  <rect x="248" y="14" width="215" height="72" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
-  <text x="310" y="58" fill="var(--face-eye)" font-size="26">14:32</text>
-  <text x="248" y="108" fill="var(--ink)" font-size="12">2 · zen clock</text>
-  <text x="248" y="123" fill="var(--dim)" font-size="10">just the time</text>
+  <rect x="196" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
+  <text x="243" y="54" fill="var(--face-eye)" font-size="24">14:32</text>
+  <text x="196" y="102" fill="var(--ink)" font-size="12">2 · zen clock</text>
+  <text x="196" y="117" fill="var(--dim)" font-size="10">just the time</text>
 
   <!-- screen 3: usage -->
-  <rect x="486" y="14" width="215" height="72" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
-  <text x="500" y="42" fill="var(--face-eye)" font-size="18">56%</text>
-  <rect x="556" y="28" width="130" height="7" rx="3.5" fill="var(--amber)"/>
-  <rect x="556" y="48" width="90" height="7" rx="3.5" fill="var(--green)"/>
-  <rect x="556" y="68" width="110" height="7" rx="3.5" fill="var(--amber)"/>
-  <text x="486" y="108" fill="var(--ink)" font-size="12">3 · claude usage</text>
-  <text x="486" y="123" fill="var(--dim)" font-size="10">5-hour + two weekly bars</text>
+  <rect x="386" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
+  <text x="398" y="40" fill="var(--face-eye)" font-size="15">56%</text>
+  <rect x="444" y="26" width="102" height="6" rx="3" fill="var(--amber)"/>
+  <rect x="444" y="44" width="72" height="6" rx="3" fill="var(--green)"/>
+  <rect x="444" y="62" width="88" height="6" rx="3" fill="var(--amber)"/>
+  <text x="386" y="102" fill="var(--ink)" font-size="12">3 · claude usage</text>
+  <text x="386" y="117" fill="var(--dim)" font-size="10">5-hour + weekly bars</text>
 
   <!-- screen 4: pc stats -->
-  <rect x="724" y="14" width="215" height="72" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
-  <text x="738" y="40" fill="#8E8C98" font-size="9">CPU</text>
-  <rect x="770" y="32" width="120" height="8" rx="4" fill="var(--accent)"/>
-  <text x="738" y="66" fill="#8E8C98" font-size="9">RAM</text>
-  <rect x="770" y="58" width="90" height="8" rx="4" fill="#8E8C98"/>
-  <text x="724" y="108" fill="var(--ink)" font-size="12">4 · pc stats</text>
-  <text x="724" y="123" fill="var(--dim)" font-size="10">cpu · ram</text>
+  <rect x="576" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
+  <text x="588" y="38" fill="#8E8C98" font-size="9">CPU</text>
+  <rect x="614" y="30" width="110" height="7" rx="3.5" fill="var(--accent)"/>
+  <text x="588" y="62" fill="#8E8C98" font-size="9">RAM</text>
+  <rect x="614" y="54" width="82" height="7" rx="3.5" fill="#8E8C98"/>
+  <text x="576" y="102" fill="var(--ink)" font-size="12">4 · pc stats</text>
+  <text x="576" y="117" fill="var(--dim)" font-size="10">cpu · ram</text>
+
+  <!-- screen 5: now playing -->
+  <rect x="766" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
+  <rect x="776" y="22" width="34" height="34" rx="4" fill="var(--accent)" opacity="0.55"/>
+  <rect x="818" y="26" width="66" height="6" rx="3" fill="var(--face-eye)"/>
+  <rect x="818" y="38" width="44" height="4" rx="2" fill="#8E8C98"/>
+  <text x="884" y="56" fill="var(--face-eye)" font-size="9">⏮ ⏯ ⏭</text>
+  <rect x="776" y="66" width="152" height="4" rx="2" fill="var(--accent)"/>
+  <text x="766" y="102" fill="var(--ink)" font-size="12">5 · now playing</text>
+  <text x="766" y="117" fill="var(--dim)" font-size="10">art · controls · dancer</text>
 </svg>
 </div>
 
@@ -394,6 +422,14 @@ Long-press the face any time to pet the buddy (it says thanks).</p>
       <text x="72" y="20" fill="#8E8C98" font-size="11">z Z</text></svg>
     <div class="name" style="color:var(--dim)">sleep</div><div class="why">companion offline 30 s; backlight dims</div>
   </div>
+  <div class="mood">
+    <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)"/>
+      <path d="M 26 22 A 26 26 0 0 1 74 22" stroke="var(--accent)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+      <rect x="20" y="20" width="7" height="15" rx="3" fill="var(--accent)"/><rect x="73" y="20" width="7" height="15" rx="3" fill="var(--accent)"/>
+      <rect x="34" y="22" width="9" height="16" rx="4.5" fill="var(--face-eye)"/><rect x="57" y="22" width="9" height="16" rx="4.5" fill="var(--face-eye)"/>
+      <path d="M 38 48 Q 50 57 62 48" stroke="var(--face-eye)" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg>
+    <div class="name" style="color:var(--accent)">groove</div><div class="why">music on — the media-screen dancer sways, blinks &amp; twirls; the main face bobs</div>
+  </div>
 </div>
 
 <h2>What each file does</h2>
@@ -401,7 +437,7 @@ Long-press the face any time to pet the buddy (it says thanks).</p>
   <div class="card">
     <strong>PC side <span class="tag">Python</span></strong>
     <ul class="filelist" style="margin-top:10px">
-      <li><span class="f">buddy_companion.py</span><span class="d">The brain. Five classes: <b>ClaudeWatcher</b> (transcripts → activity/context), <b>UsageAPI</b> (official limits + token refresh), <b>UsageTracker</b> (token math fallback), <b>OtelReceiver</b> (cost listener), and the two <b>transports</b> (USB serial, BLE) with heartbeat.</span></li>
+      <li><span class="f">buddy_companion.py</span><span class="d">The brain. Six classes: <b>ClaudeWatcher</b> (transcripts → activity/context), <b>UsageAPI</b> (official limits + token refresh), <b>UsageTracker</b> (token math fallback), <b>OtelReceiver</b> (cost listener), <b>MediaWatcher</b> (now playing + album art + transport commands), and the two <b>transports</b> (USB serial, BLE) with heartbeat.</span></li>
       <li><span class="f">buddy_hook.py</span><span class="d">Fired by Claude Code on every tool use / prompt / notification / stop (registered in <code>~/.claude/settings.json</code>). Writes one event line; never blocks Claude.</span></li>
       <li><span class="f">run_buddy.bat</span><span class="d">Manual launcher with a visible console.</span></li>
       <li><span class="f">start_buddy_hidden.vbs</span><span class="d">Silent launcher; a copy lives in <code>shell:startup</code> so it runs at login.</span></li>
@@ -410,8 +446,8 @@ Long-press the face any time to pet the buddy (it says thanks).</p>
   <div class="card">
     <strong>Firmware <span class="tag">C++ / LVGL 9</span></strong>
     <ul class="filelist" style="margin-top:10px">
-      <li><span class="f">main.cpp</span><span class="d">Setup + loop: parses JSON frames from both links, reads battery, answers pings, 30 s offline watchdog.</span></li>
-      <li><span class="f">buddy_ui.cpp</span><span class="d">All four screens, the face and its animations (blink timer, pupil wander, mood morphs), bars, toasts, pet gesture.</span></li>
+      <li><span class="f">main.cpp</span><span class="d">Setup + loop: parses JSON frames from both links, reassembles album art, reads battery, answers pings, 30 s offline watchdog.</span></li>
+      <li><span class="f">buddy_ui.cpp</span><span class="d">All five screens, the face and its animations (blink, pupil wander, mood morphs, head-bob, the dancer), bars, toasts, pet + swipe gestures.</span></li>
       <li><span class="f">lvgl_port.c</span><span class="d">Panel + touch glue: QSPI at 40 MHz to the AXS15231B, chunked DMA flush, software rotation to landscape. Built on Waveshare's proven vendor driver (<code>axs15231b/</code>, <code>touch/</code>).</span></li>
       <li><span class="f">ble_link.cpp</span><span class="d">Bluetooth: Nordic-UART-style service advertising as <em>ClaudeBuddy</em>.</span></li>
       <li><span class="f">power_latch.cpp</span><span class="d">Battery power control (diagram below).</span></li>
@@ -468,7 +504,7 @@ Miss that window (like our first firmware did) and the board dies the instant yo
 </div>
 
 <footer>
-  Claude Buddy v1.0 · built July 2026 · repo: <span class="mono">code\applications\Desktop Buddy</span> ·
+  Claude Buddy v1.1 (music update) · built July 2026 · repo: <span class="mono">code\applications\Desktop Buddy</span> ·
   full setup &amp; troubleshooting in the README
 </footer>
 </main>
