@@ -1,0 +1,474 @@
+<title>Claude Buddy — How It's Built</title>
+<style>
+  :root {
+    --bg: #F6F2EC;
+    --panel: #FFFFFF;
+    --panel2: #EFEAE1;
+    --ink: #23233A;
+    --dim: #6E6C78;
+    --line: #D8D2C6;
+    --accent: #C96442;
+    --green: #4E9455;
+    --amber: #B07C1F;
+    --red: #C13B40;
+    --eye: #23233A;
+    --facebg: #1A1A2E;
+    --face-eye: #F2EFEA;
+    --code-bg: #1A1A2E;
+    --code-ink: #D6D3CC;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F0F1A;
+      --panel: #1A1A2E;
+      --panel2: #14141F;
+      --ink: #E8E5DE;
+      --dim: #8E8C98;
+      --line: #2E2E44;
+      --accent: #D97757;
+      --green: #7BC47F;
+      --amber: #E5A84B;
+      --red: #E5484D;
+      --eye: #F2EFEA;
+      --facebg: #1A1A2E;
+      --face-eye: #F2EFEA;
+      --code-bg: #14141F;
+      --code-ink: #C9C7C1;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F0F1A; --panel: #1A1A2E; --panel2: #14141F; --ink: #E8E5DE;
+    --dim: #8E8C98; --line: #2E2E44; --accent: #D97757; --green: #7BC47F;
+    --amber: #E5A84B; --red: #E5484D; --eye: #F2EFEA; --facebg: #1A1A2E;
+    --face-eye: #F2EFEA; --code-bg: #14141F; --code-ink: #C9C7C1;
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F2EC; --panel: #FFFFFF; --panel2: #EFEAE1; --ink: #23233A;
+    --dim: #6E6C78; --line: #D8D2C6; --accent: #C96442; --green: #4E9455;
+    --amber: #B07C1F; --red: #C13B40; --eye: #23233A; --facebg: #1A1A2E;
+    --face-eye: #F2EFEA; --code-bg: #1A1A2E; --code-ink: #D6D3CC;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.55; margin: 0; padding: 0 20px 80px;
+  }
+  main { max-width: 960px; margin: 0 auto; }
+  .mono, code, .pin, .tag {
+    font-family: "Cascadia Code", Consolas, "SF Mono", monospace;
+  }
+  h1 { font-size: 30px; margin: 8px 0 4px; letter-spacing: -0.5px; text-wrap: balance; }
+  h2 {
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 15px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); margin: 56px 0 6px;
+  }
+  h2::before { content: "// "; color: var(--dim); }
+  .sub { color: var(--dim); max-width: 640px; margin: 0 0 20px; }
+  p { max-width: 660px; }
+
+  header { display: flex; align-items: center; gap: 24px; padding: 44px 0 8px; flex-wrap: wrap; }
+  .hero-face { flex: 0 0 auto; }
+  .hero-face svg { display: block; }
+  .eyelid { animation: blink 4.6s infinite; transform-origin: center; }
+  @keyframes blink {
+    0%, 93%, 100% { transform: scaleY(1); }
+    95%, 97% { transform: scaleY(0.08); }
+  }
+  @media (prefers-reduced-motion: reduce) { .eyelid { animation: none; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 18px 20px; margin: 14px 0;
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .diagram-wrap { overflow-x: auto; margin: 18px 0; }
+  .diagram-wrap svg { min-width: 720px; width: 100%; height: auto; display: block; }
+  svg text { font-family: "Cascadia Code", Consolas, monospace; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; letter-spacing: 1.5px;
+       text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  td:first-child { white-space: nowrap; }
+  .table-wrap { overflow-x: auto; }
+
+  .tag {
+    display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--dim); margin-left: 6px; vertical-align: 1px;
+  }
+  .pin { color: var(--accent); font-size: 13px; }
+
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 10px;
+    padding: 18px 20px; overflow-x: auto; font-size: 13.5px; line-height: 1.7;
+    border: 1px solid var(--line);
+  }
+  .k { color: #E5A84B; } .v { color: #7BC47F; } .cm { color: #77758a; }
+
+  .filelist { list-style: none; padding: 0; margin: 0; font-size: 14.5px; }
+  .filelist li { padding: 7px 0; border-bottom: 1px dashed var(--line); display: flex; gap: 14px; flex-wrap: wrap; }
+  .filelist li:last-child { border-bottom: none; }
+  .filelist .f { font-family: "Cascadia Code", Consolas, monospace; color: var(--accent);
+                 flex: 0 0 220px; font-size: 13px; }
+  .filelist .d { flex: 1; min-width: 240px; color: var(--ink); }
+
+  .moods { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .mood { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+          padding: 12px; text-align: center; }
+  .mood svg { display: block; margin: 0 auto 8px; }
+  .mood .name { font-family: "Cascadia Code", Consolas, monospace; font-size: 12.5px; letter-spacing: 1px; }
+  .mood .why { font-size: 12.5px; color: var(--dim); margin-top: 3px; line-height: 1.35; }
+
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: var(--dim); margin-top: 6px; }
+  .legend span::before { content: "—"; font-weight: bold; margin-right: 6px; }
+  .lg-o::before { color: var(--accent); } .lg-g::before { color: var(--green); }
+  .lg-b::before { color: var(--dim); }
+
+  footer { margin-top: 64px; color: var(--dim); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+  a { color: var(--accent); }
+</style>
+
+<main>
+<header>
+  <div class="hero-face" aria-hidden="true">
+    <svg width="150" height="112" viewBox="0 0 200 150">
+      <rect x="4" y="4" width="192" height="142" rx="18" fill="var(--facebg)" stroke="var(--accent)" stroke-width="3"/>
+      <g class="eyelid">
+        <rect x="52" y="38" width="26" height="44" rx="13" fill="var(--face-eye)"/>
+        <rect x="122" y="38" width="26" height="44" rx="13" fill="var(--face-eye)"/>
+        <circle cx="67" cy="60" r="6" fill="#14141F"/>
+        <circle cx="137" cy="60" r="6" fill="#14141F"/>
+      </g>
+      <path d="M 74 104 Q 100 124 126 104" stroke="var(--face-eye)" stroke-width="6" fill="none" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div>
+    <h1>Claude Buddy — how it's built</h1>
+    <p class="sub">A 172×640 touchscreen on an ESP32-S3, fed by a Python companion on the PC.
+    Three programs, two radios, one little face. Here's every moving part.</p>
+  </div>
+</header>
+
+<h2>The big picture</h2>
+<p class="sub">Data flows left to right: Anthropic's cloud and Claude Code's local files feed the
+companion, which condenses everything into one small JSON frame every 2 seconds and ships it
+to the display over whichever link is available.</p>
+
+<div class="diagram-wrap card">
+<svg viewBox="0 0 940 400" role="img" aria-label="Architecture: cloud and Claude Code feed the companion, which sends frames to the ESP32 over USB or BLE">
+  <!-- zone headers -->
+  <text x="90" y="26" fill="var(--dim)" font-size="12" letter-spacing="2">ANTHROPIC CLOUD</text>
+  <text x="330" y="26" fill="var(--dim)" font-size="12" letter-spacing="2">YOUR PC</text>
+  <text x="760" y="26" fill="var(--dim)" font-size="12" letter-spacing="2">THE BUDDY</text>
+  <line x1="255" y1="14" x2="255" y2="390" stroke="var(--line)" stroke-dasharray="4 5"/>
+  <line x1="690" y1="14" x2="690" y2="390" stroke="var(--line)" stroke-dasharray="4 5"/>
+
+  <!-- cloud: usage api -->
+  <rect x="30" y="46" width="195" height="64" rx="10" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="46" y="72" fill="var(--ink)" font-size="13">usage API</text>
+  <text x="46" y="92" fill="var(--dim)" font-size="10.5">/api/oauth/usage · official limits</text>
+
+  <!-- Claude Code -->
+  <rect x="285" y="46" width="180" height="64" rx="10" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="301" y="72" fill="var(--ink)" font-size="13">Claude Code</text>
+  <text x="301" y="92" fill="var(--dim)" font-size="10.5">the thing doing the work</text>
+
+  <!-- three local sources -->
+  <rect x="285" y="132" width="180" height="46" rx="8" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="301" y="151" fill="var(--ink)" font-size="12">transcripts (.jsonl)</text>
+  <text x="301" y="168" fill="var(--dim)" font-size="10">tokens · activity · context</text>
+
+  <rect x="285" y="190" width="180" height="46" rx="8" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="301" y="209" fill="var(--ink)" font-size="12">hooks → events file</text>
+  <text x="301" y="226" fill="var(--dim)" font-size="10">instant tool/permission events</text>
+
+  <rect x="285" y="248" width="180" height="46" rx="8" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="301" y="267" fill="var(--ink)" font-size="12">OpenTelemetry push</text>
+  <text x="301" y="284" fill="var(--dim)" font-size="10">exact cost, every 10 s</text>
+
+  <!-- claude code feeds the three -->
+  <path d="M 375 110 L 375 132" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
+  <path d="M 350 110 C 330 118 325 170 337 190" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
+  <path d="M 330 110 C 300 130 295 215 320 248" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
+
+  <!-- companion -->
+  <rect x="510" y="120" width="155" height="160" rx="12" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+  <text x="530" y="147" fill="var(--accent)" font-size="14">companion</text>
+  <text x="530" y="164" fill="var(--dim)" font-size="10.5">buddy_companion.py</text>
+  <text x="530" y="192" fill="var(--ink)" font-size="10.5">· watches sources</text>
+  <text x="530" y="210" fill="var(--ink)" font-size="10.5">· builds status frame</text>
+  <text x="530" y="228" fill="var(--ink)" font-size="10.5">· 2 s cadence</text>
+  <text x="530" y="246" fill="var(--ink)" font-size="10.5">· heartbeat + reconnect</text>
+
+  <!-- sources -> companion -->
+  <path d="M 225 78 C 400 78 430 150 510 158" stroke="var(--green)" fill="none" marker-end="url(#arrg)"/>
+  <text x="410" y="70" fill="var(--green)" font-size="10">poll · 5 min</text>
+  <path d="M 465 155 L 510 172" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
+  <path d="M 465 213 L 510 213" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
+  <path d="M 465 271 L 510 248" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
+
+  <!-- transports -->
+  <path d="M 665 175 L 725 175" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#arro)"/>
+  <text x="672" y="165" fill="var(--accent)" font-size="10.5">USB serial</text>
+  <path d="M 665 235 L 725 235" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#arro)"/>
+  <text x="672" y="258" fill="var(--accent)" font-size="10.5">Bluetooth LE</text>
+  <text x="672" y="271" fill="var(--dim)" font-size="9.5">fallback, no cable</text>
+
+  <!-- ESP32 device -->
+  <rect x="725" y="96" width="185" height="230" rx="12" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="742" y="122" fill="var(--ink)" font-size="13">ESP32-S3 firmware</text>
+  <rect x="742" y="138" width="152" height="34" rx="6" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="752" y="160" fill="var(--ink)" font-size="11">main.cpp — protocol</text>
+  <rect x="742" y="180" width="152" height="34" rx="6" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="752" y="202" fill="var(--ink)" font-size="11">buddy_ui — LVGL face</text>
+  <rect x="742" y="222" width="152" height="34" rx="6" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="752" y="244" fill="var(--ink)" font-size="11">lvgl_port — panel/touch</text>
+  <rect x="742" y="264" width="152" height="34" rx="6" fill="var(--panel)" stroke="var(--line)"/>
+  <text x="752" y="286" fill="var(--ink)" font-size="11">ble + power + battery</text>
+
+  <!-- screen -->
+  <rect x="742" y="344" width="152" height="34" rx="8" fill="var(--facebg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <circle cx="768" cy="361" r="4" fill="var(--face-eye)"/>
+  <circle cx="786" cy="361" r="4" fill="var(--face-eye)"/>
+  <path d="M 766 369 Q 777 375 788 369" stroke="var(--face-eye)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <text x="812" y="366" fill="var(--dim)" font-size="10">172×640 IPS</text>
+  <path d="M 818 326 L 818 344" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
+
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="var(--dim)"/></marker>
+    <marker id="arrg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="var(--green)"/></marker>
+    <marker id="arro" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="var(--accent)"/></marker>
+  </defs>
+</svg>
+<div class="legend">
+  <span class="lg-b">local file watching</span>
+  <span class="lg-g">authenticated cloud poll</span>
+  <span class="lg-o">the wire to the buddy</span>
+</div>
+</div>
+
+<h2>Where each number comes from</h2>
+<p class="sub">Four independent sources, each used for what it's uniquely good at. If one
+disappears, the others keep working.</p>
+<div class="card table-wrap">
+<table>
+  <tr><th>Source</th><th>How it's read</th><th>What it powers on screen</th></tr>
+  <tr>
+    <td>Official usage API</td>
+    <td>OAuth token from <code>~/.claude/.credentials.json</code>, polled every 5 min, auto-refreshed</td>
+    <td>The three limit bars: 5-hour block, weekly all-models, weekly current-model — identical to the app's panel</td>
+  </tr>
+  <tr>
+    <td>Hooks</td>
+    <td>Claude Code fires <code>buddy_hook.py</code> on every tool use, prompt, notification and stop; it appends one line to an events file</td>
+    <td>Instant mood changes — <em>working</em> with the tool's name, wide-eyed <em>waiting</em> the moment a permission prompt appears, <em>done</em> smile</td>
+  </tr>
+  <tr>
+    <td>Transcripts</td>
+    <td>Tails <code>~/.claude/projects/**/*.jsonl</code> — every response logs exact token counts</td>
+    <td>Context-window gauge, active project name, multi-session count, fallback activity detection</td>
+  </tr>
+  <tr>
+    <td>OpenTelemetry</td>
+    <td>Claude Code pushes metrics to the companion's listener on <code>localhost:4318</code></td>
+    <td>Today's dollar cost on the usage screen</td>
+  </tr>
+</table>
+</div>
+
+<h2>One frame, every two seconds</h2>
+<p class="sub">Everything the buddy knows arrives as a single line of JSON — identical over USB
+and Bluetooth. The firmware never talks to the network; it just renders what it's told.</p>
+<pre>{ <span class="k">"t"</span>:<span class="v">"s"</span>,                          <span class="cm">// status frame</span>
+  <span class="k">"claude"</span>:<span class="v">"working"</span>,               <span class="cm">// → mood: focused eyes + typing dots</span>
+  <span class="k">"head"</span>:<span class="v">"Claude is working"</span>,       <span class="cm">// headline text</span>
+  <span class="k">"msg"</span>:<span class="v">"Edit: main.cpp"</span>,           <span class="cm">// scrolling detail (from hooks)</span>
+  <span class="k">"proj"</span>:<span class="v">"Desktop Buddy"</span>,           <span class="cm">// active project, or "2 sessions: …"</span>
+  <span class="k">"ctx"</span>:<span class="v">32</span>, <span class="k">"ctxt"</span>:<span class="v">"323k / 1.0M"</span>,  <span class="cm">// context-window gauge</span>
+  <span class="k">"use"</span>: { <span class="k">"pct"</span>:<span class="v">56</span>, <span class="k">"rst"</span>:<span class="v">"4h 19m"</span>,        <span class="cm">// 5-hour block</span>
+           <span class="k">"w"</span>:<span class="v">38</span>, <span class="k">"wm"</span>:<span class="v">61</span>, <span class="k">"wrst"</span>:<span class="v">"Jul 12"</span>, <span class="cm">// weekly bars</span>
+           <span class="k">"day"</span>:<span class="v">"41M tok · $12.40"</span> },
+  <span class="k">"cpu"</span>:<span class="v">31</span>, <span class="k">"ram"</span>:<span class="v">62</span>, <span class="k">"clk"</span>:<span class="v">"14:32"</span>, <span class="k">"date"</span>:<span class="v">"Wed Jul 09"</span> }
+
+<span class="cm">// buddy → PC:  {"t":"hello"} on boot · {"t":"pong"} to pings · {"t":"pet"} when petted</span>
+<span class="cm">// 30 s of silence → companion reconnects · 30 s without frames → buddy goes to sleep</span></pre>
+
+<h2>The four screens</h2>
+<p class="sub">Tap anywhere (outside the face) to cycle. Battery, charge state and the
+USB/Bluetooth link icon ride along in the corner of every screen.</p>
+<div class="diagram-wrap card">
+<svg viewBox="0 0 940 130" role="img" aria-label="Four screens: buddy, zen clock, claude usage, pc stats">
+  <!-- screen 1: buddy -->
+  <rect x="10" y="14" width="215" height="72" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
+  <rect x="24" y="30" width="9" height="20" rx="4.5" fill="var(--face-eye)"/>
+  <rect x="42" y="30" width="9" height="20" rx="4.5" fill="var(--face-eye)"/>
+  <path d="M 27 62 Q 38 70 49 62" stroke="var(--face-eye)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <rect x="70" y="30" width="80" height="7" rx="3" fill="var(--accent)"/>
+  <rect x="70" y="44" width="60" height="5" rx="2.5" fill="#8E8C98"/>
+  <rect x="70" y="66" width="70" height="5" rx="2.5" fill="var(--green)"/>
+  <text x="163" y="40" fill="var(--face-eye)" font-size="13">14:32</text>
+  <text x="163" y="56" fill="#8E8C98" font-size="7">context 32%</text>
+  <rect x="163" y="62" width="48" height="5" rx="2.5" fill="var(--green)"/>
+  <text x="10" y="108" fill="var(--ink)" font-size="12">1 · buddy</text>
+  <text x="10" y="123" fill="var(--dim)" font-size="10">face · status · context</text>
+
+  <!-- screen 2: zen -->
+  <rect x="248" y="14" width="215" height="72" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
+  <text x="310" y="58" fill="var(--face-eye)" font-size="26">14:32</text>
+  <text x="248" y="108" fill="var(--ink)" font-size="12">2 · zen clock</text>
+  <text x="248" y="123" fill="var(--dim)" font-size="10">just the time</text>
+
+  <!-- screen 3: usage -->
+  <rect x="486" y="14" width="215" height="72" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
+  <text x="500" y="42" fill="var(--face-eye)" font-size="18">56%</text>
+  <rect x="556" y="28" width="130" height="7" rx="3.5" fill="var(--amber)"/>
+  <rect x="556" y="48" width="90" height="7" rx="3.5" fill="var(--green)"/>
+  <rect x="556" y="68" width="110" height="7" rx="3.5" fill="var(--amber)"/>
+  <text x="486" y="108" fill="var(--ink)" font-size="12">3 · claude usage</text>
+  <text x="486" y="123" fill="var(--dim)" font-size="10">5-hour + two weekly bars</text>
+
+  <!-- screen 4: pc stats -->
+  <rect x="724" y="14" width="215" height="72" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
+  <text x="738" y="40" fill="#8E8C98" font-size="9">CPU</text>
+  <rect x="770" y="32" width="120" height="8" rx="4" fill="var(--accent)"/>
+  <text x="738" y="66" fill="#8E8C98" font-size="9">RAM</text>
+  <rect x="770" y="58" width="90" height="8" rx="4" fill="#8E8C98"/>
+  <text x="724" y="108" fill="var(--ink)" font-size="12">4 · pc stats</text>
+  <text x="724" y="123" fill="var(--dim)" font-size="10">cpu · ram</text>
+</svg>
+</div>
+
+<h2>Moods</h2>
+<p class="sub">The face is state, not decoration — each expression maps to a real signal.
+Long-press the face any time to pet the buddy (it says thanks).</p>
+<div class="moods">
+  <div class="mood">
+    <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)"/>
+      <rect x="26" y="14" width="12" height="24" rx="6" fill="var(--face-eye)"/><rect x="62" y="14" width="12" height="24" rx="6" fill="var(--face-eye)"/>
+      <circle cx="32" cy="26" r="3.4" fill="#14141F"/><circle cx="68" cy="26" r="3.4" fill="#14141F"/>
+      <path d="M 40 50 Q 50 56 60 50" stroke="var(--face-eye)" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
+    <div class="name">idle</div><div class="why">connected, nothing happening; blinks &amp; looks around</div>
+  </div>
+  <div class="mood">
+    <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)"/>
+      <rect x="26" y="17" width="12" height="19" rx="6" fill="var(--face-eye)"/><rect x="62" y="17" width="12" height="19" rx="6" fill="var(--face-eye)"/>
+      <circle cx="34" cy="24" r="3.4" fill="#14141F"/><circle cx="70" cy="24" r="3.4" fill="#14141F"/>
+      <rect x="42" y="48" width="16" height="4" rx="2" fill="var(--face-eye)"/>
+      <circle cx="30" cy="58" r="2.6" fill="var(--accent)"/><circle cx="40" cy="58" r="2.6" fill="var(--accent)" opacity="0.6"/><circle cx="50" cy="58" r="2.6" fill="var(--accent)" opacity="0.3"/></svg>
+    <div class="name" style="color:var(--accent)">working</div><div class="why">hook fired; pupils focus, typing dots pulse</div>
+  </div>
+  <div class="mood">
+    <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)"/>
+      <rect x="24" y="10" width="14" height="30" rx="7" fill="var(--face-eye)"/><rect x="62" y="10" width="14" height="30" rx="7" fill="var(--face-eye)"/>
+      <circle cx="31" cy="25" r="3.6" fill="#14141F"/><circle cx="69" cy="25" r="3.6" fill="#14141F"/>
+      <circle cx="50" cy="52" r="6" fill="none" stroke="var(--face-eye)" stroke-width="3.6"/></svg>
+    <div class="name" style="color:var(--amber)">waiting</div><div class="why">permission prompt is up — Claude needs you</div>
+  </div>
+  <div class="mood">
+    <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)"/>
+      <rect x="25" y="20" width="14" height="7" rx="3.5" fill="var(--face-eye)"/><rect x="61" y="20" width="14" height="7" rx="3.5" fill="var(--face-eye)"/>
+      <path d="M 36 44 Q 50 58 64 44" stroke="var(--face-eye)" stroke-width="4.5" fill="none" stroke-linecap="round"/></svg>
+    <div class="name" style="color:var(--green)">happy</div><div class="why">task finished (or you petted it)</div>
+  </div>
+  <div class="mood">
+    <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)"/>
+      <rect x="22" y="8" width="15" height="5" rx="2.5" fill="var(--face-eye)" transform="rotate(20 30 10)"/>
+      <rect x="63" y="8" width="15" height="5" rx="2.5" fill="var(--face-eye)" transform="rotate(-20 70 10)"/>
+      <rect x="26" y="18" width="12" height="20" rx="6" fill="var(--face-eye)"/><rect x="62" y="18" width="12" height="20" rx="6" fill="var(--face-eye)"/>
+      <circle cx="32" cy="29" r="3.2" fill="#14141F"/><circle cx="68" cy="29" r="3.2" fill="#14141F"/>
+      <path d="M 38 54 Q 50 46 62 54" stroke="var(--face-eye)" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
+    <div class="name" style="color:var(--red)">error</div><div class="why">something failed; eyebrows deploy</div>
+  </div>
+  <div class="mood">
+    <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)"/>
+      <rect x="25" y="26" width="15" height="4" rx="2" fill="var(--face-eye)"/><rect x="60" y="26" width="15" height="4" rx="2" fill="var(--face-eye)"/>
+      <rect x="43" y="46" width="14" height="4" rx="2" fill="var(--face-eye)"/>
+      <text x="72" y="20" fill="#8E8C98" font-size="11">z Z</text></svg>
+    <div class="name" style="color:var(--dim)">sleep</div><div class="why">companion offline 30 s; backlight dims</div>
+  </div>
+</div>
+
+<h2>What each file does</h2>
+<div class="grid2">
+  <div class="card">
+    <strong>PC side <span class="tag">Python</span></strong>
+    <ul class="filelist" style="margin-top:10px">
+      <li><span class="f">buddy_companion.py</span><span class="d">The brain. Five classes: <b>ClaudeWatcher</b> (transcripts → activity/context), <b>UsageAPI</b> (official limits + token refresh), <b>UsageTracker</b> (token math fallback), <b>OtelReceiver</b> (cost listener), and the two <b>transports</b> (USB serial, BLE) with heartbeat.</span></li>
+      <li><span class="f">buddy_hook.py</span><span class="d">Fired by Claude Code on every tool use / prompt / notification / stop (registered in <code>~/.claude/settings.json</code>). Writes one event line; never blocks Claude.</span></li>
+      <li><span class="f">run_buddy.bat</span><span class="d">Manual launcher with a visible console.</span></li>
+      <li><span class="f">start_buddy_hidden.vbs</span><span class="d">Silent launcher; a copy lives in <code>shell:startup</code> so it runs at login.</span></li>
+    </ul>
+  </div>
+  <div class="card">
+    <strong>Firmware <span class="tag">C++ / LVGL 9</span></strong>
+    <ul class="filelist" style="margin-top:10px">
+      <li><span class="f">main.cpp</span><span class="d">Setup + loop: parses JSON frames from both links, reads battery, answers pings, 30 s offline watchdog.</span></li>
+      <li><span class="f">buddy_ui.cpp</span><span class="d">All four screens, the face and its animations (blink timer, pupil wander, mood morphs), bars, toasts, pet gesture.</span></li>
+      <li><span class="f">lvgl_port.c</span><span class="d">Panel + touch glue: QSPI at 40 MHz to the AXS15231B, chunked DMA flush, software rotation to landscape. Built on Waveshare's proven vendor driver (<code>axs15231b/</code>, <code>touch/</code>).</span></li>
+      <li><span class="f">ble_link.cpp</span><span class="d">Bluetooth: Nordic-UART-style service advertising as <em>ClaudeBuddy</em>.</span></li>
+      <li><span class="f">power_latch.cpp</span><span class="d">Battery power control (diagram below).</span></li>
+      <li><span class="f">lcd_bl_bsp/</span><span class="d">Backlight PWM — full when awake, dim in sleep.</span></li>
+    </ul>
+  </div>
+</div>
+
+<h2>The battery trick</h2>
+<p class="sub">The PWR button doesn't actually switch the battery — it only feeds power while
+held. An I/O-expander chip holds the real switch, and the firmware must grab it during boot.
+Miss that window (like our first firmware did) and the board dies the instant you let go.</p>
+<div class="diagram-wrap card">
+<svg viewBox="0 0 940 120" role="img" aria-label="Power latch sequence">
+  <rect x="14" y="30" width="180" height="58" rx="10" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="30" y="55" fill="var(--ink)" font-size="12.5">hold PWR ~2 s</text>
+  <text x="30" y="74" fill="var(--dim)" font-size="10.5">battery flows while held</text>
+
+  <path d="M 194 59 L 240 59" stroke="var(--dim)" fill="none" marker-end="url(#arr2)"/>
+
+  <rect x="242" y="30" width="200" height="58" rx="10" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="258" y="55" fill="var(--ink)" font-size="12.5">firmware boots (~0.5 s)</text>
+  <text x="258" y="74" fill="var(--dim)" font-size="10.5">power_latch_init() runs early</text>
+
+  <path d="M 442 59 L 488 59" stroke="var(--dim)" fill="none" marker-end="url(#arr2)"/>
+
+  <rect x="490" y="30" width="230" height="58" rx="10" fill="none" stroke="var(--accent)" stroke-width="2"/>
+  <text x="506" y="55" fill="var(--accent)" font-size="12.5">TCA9554 pin 6 → HIGH</text>
+  <text x="506" y="74" fill="var(--dim)" font-size="10.5">latch engaged — release the button</text>
+
+  <path d="M 720 59 L 766 59" stroke="var(--dim)" fill="none" marker-end="url(#arr2)"/>
+
+  <rect x="768" y="30" width="158" height="58" rx="10" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="784" y="55" fill="var(--ink)" font-size="12.5">stays on</text>
+  <text x="784" y="74" fill="var(--dim)" font-size="10.5">hold PWR 3 s → off</text>
+
+  <defs><marker id="arr2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+    <path d="M0,0 L8,4 L0,8 z" fill="var(--dim)"/></marker></defs>
+</svg>
+</div>
+
+<h2>Hardware at a glance</h2>
+<div class="card table-wrap">
+<table>
+  <tr><th>Part</th><th>Detail</th><th>Wired to</th></tr>
+  <tr><td>Display</td><td>3.49″ IPS, 172×640, AXS15231B controller</td><td class="pin">QSPI: CS 9 · CLK 10 · D0–D3 11–14 · RST 21</td></tr>
+  <tr><td>Touch</td><td>capacitive, built into the display chip</td><td class="pin">I2C1: SDA 17 · SCL 18 · addr 0x3B</td></tr>
+  <tr><td>Backlight</td><td>PWM dimmable (inverted)</td><td class="pin">GPIO 8</td></tr>
+  <tr><td>Battery sense</td><td>voltage divider ÷3 → LiPo % curve</td><td class="pin">GPIO 4 (ADC1_CH3)</td></tr>
+  <tr><td>Power latch</td><td>TCA9554 I/O expander, pin 6</td><td class="pin">I2C0: SDA 47 · SCL 48 · addr 0x20</td></tr>
+  <tr><td>PWR button</td><td>momentary, read for the 3 s power-off hold</td><td class="pin">GPIO 16</td></tr>
+  <tr><td>Brains</td><td>ESP32-S3, dual-core 240 MHz, 8 MB PSRAM, 16 MB flash</td><td class="pin">USB-C native CDC + BLE radio</td></tr>
+</table>
+</div>
+
+<footer>
+  Claude Buddy v1.0 · built July 2026 · repo: <span class="mono">code\applications\Desktop Buddy</span> ·
+  full setup &amp; troubleshooting in the README
+</footer>
+</main>
