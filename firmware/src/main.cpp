@@ -241,7 +241,7 @@ void loop()
         }
     }
 
-    static char ble_buf[512];
+    static char ble_buf[768];   /* must fit art chunk lines (~700 chars) */
     while (ble_link_read_line(ble_buf, sizeof(ble_buf)) > 0) {
         handle_line(ble_buf);
         last_rx_ms = millis();

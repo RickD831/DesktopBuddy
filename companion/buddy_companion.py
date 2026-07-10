@@ -937,9 +937,8 @@ def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None,
             chunk = art[i * ART_RAW_CHUNK:(i + 1) * ART_RAW_CHUNK]
             transport.write_line(json.dumps(
                 {"t": "art", "w": media.ART_SIZE, "h": media.ART_SIZE,
-                 "seq": i, "n": n, "d": base64.b64encode(chunk).decode()}),
-                reliable=True)
-            time.sleep(0.01)
+                 "seq": i, "n": n, "d": base64.b64encode(chunk).decode()}))
+            time.sleep(0.015)
         print(f"[{datetime.now():%H:%M:%S}] sent album art ({n} chunks)")
     try:
         while True:
