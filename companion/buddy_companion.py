@@ -1029,6 +1029,8 @@ def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None,
                     print(f"[{now:%H:%M:%S}] you petted the buddy \\(^-^)/")
                 elif ev.get("t") == "hello":
                     print(f"[{now:%H:%M:%S}] buddy firmware {ev.get('fw')} says hello")
+                elif ev.get("t") == "pong" and ev.get("imu"):
+                    print(f"[{now:%H:%M:%S}] imu {ev['imu']}")
 
             time.sleep(STATUS_INTERVAL)
     finally:

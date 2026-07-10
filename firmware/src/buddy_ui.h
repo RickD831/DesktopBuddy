@@ -54,6 +54,9 @@ void buddy_set_media_cmd_cb(void (*cb)(const char *cmd));
 /* Album art arrived: RGB565 little-endian pixels (buffer must stay alive). */
 void buddy_media_art_ready(const unsigned char *pixels, int w, int h);
 
+/* 0 = landscape, 1 = portrait, 2 = portrait flipped, 3 = landscape flipped. */
+void buddy_set_orientation(int mode);
+
 /* Fired from LVGL task when the user long-presses the buddy's face. */
 void buddy_set_pet_cb(void (*cb)(void));
 

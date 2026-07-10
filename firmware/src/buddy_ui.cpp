@@ -65,6 +65,7 @@ static lv_obj_t *week_all_bar, *week_all_lbl, *week_mdl_bar, *week_mdl_lbl;
 
 /* battery + link indicator (one label per screen) */
 static lv_obj_t *batt_lbl, *zen_batt_lbl, *use_batt_lbl, *stats_batt_lbl;
+static lv_obj_t *use_title_lbl, *stats_title_lbl;
 
 /* PC stats screen + context gauge on the buddy screen */
 static lv_obj_t *scr_stats;
@@ -569,8 +570,8 @@ static void build_stats_screen(void)
 {
     scr_stats = make_screen();
 
-    lv_obj_t *title = make_label(scr_stats, &lv_font_montserrat_12, C_DIM, "pc stats");
-    lv_obj_set_pos(title, 24, 10);
+    stats_title_lbl = make_label(scr_stats, &lv_font_montserrat_12, C_DIM, "pc stats");
+    lv_obj_set_pos(stats_title_lbl, 24, 10);
 
     cpu_lbl = make_label(scr_stats, &lv_font_montserrat_16, C_TEXT, "CPU  --%");
     lv_obj_set_pos(cpu_lbl, 40, 42);
@@ -625,8 +626,8 @@ static void build_usage_screen(void)
 {
     scr_use = make_screen();
 
-    lv_obj_t *title = make_label(scr_use, &lv_font_montserrat_12, C_DIM, "claude usage");
-    lv_obj_set_pos(title, 24, 10);
+    use_title_lbl = make_label(scr_use, &lv_font_montserrat_12, C_DIM, "claude usage");
+    lv_obj_set_pos(use_title_lbl, 24, 10);
 
     use_pct_lbl = make_label(scr_use, &lv_font_montserrat_48, C_EYE, "--%");
     lv_obj_set_pos(use_pct_lbl, 24, 34);
@@ -1113,6 +1114,166 @@ static void build_toast(void)
     lv_obj_set_width(toast_lbl, SCR_W - 120);
     lv_label_set_long_mode(toast_lbl, LV_LABEL_LONG_DOT);
     lv_obj_align(toast_lbl, LV_ALIGN_LEFT_MID, 52, 0);
+}
+
+/* ---------- orientation: one widget set, two arrangements ---------- */
+
+static void layout_apply(bool portrait)
+{
+    if (!portrait) {
+        /* landscape 640x172 (the original layout) */
+        lv_obj_set_size(face_cont, FACE_W - 14, 158);
+        lv_obj_align(face_cont, LV_ALIGN_TOP_LEFT, 7, 7);
+        lv_obj_align(headline_lbl, LV_ALIGN_TOP_LEFT, FACE_W + 18, 14);
+        lv_obj_set_width(msg_lbl, 235);
+        lv_obj_align(msg_lbl, LV_ALIGN_TOP_LEFT, FACE_W + 18, 46);
+        lv_obj_align(proj_lbl, LV_ALIGN_TOP_LEFT, FACE_W + 18, 70);
+        for (int i = 0; i < 3; i++)
+            lv_obj_align(dots[i], LV_ALIGN_TOP_LEFT, FACE_W + 18 + i * 18, 96);
+        lv_obj_set_width(med_line_lbl, 235);
+        lv_obj_align(med_line_lbl, LV_ALIGN_TOP_LEFT, FACE_W + 18, 126);
+        lv_obj_align(clk_lbl, LV_ALIGN_TOP_RIGHT, -16, 12);
+        lv_obj_align(date_lbl, LV_ALIGN_TOP_RIGHT, -16, 46);
+        lv_obj_align(batt_lbl, LV_ALIGN_TOP_RIGHT, -16, 62);
+        lv_obj_align(ctx_lbl, LV_ALIGN_TOP_LEFT, 640 - 166, 82);
+        lv_obj_set_size(ctx_bar, 150, 8);
+        lv_obj_align(ctx_bar, LV_ALIGN_TOP_LEFT, 640 - 166, 100);
+        lv_obj_align(use_mini_lbl, LV_ALIGN_TOP_LEFT, 640 - 166, 118);
+        lv_obj_set_size(use_mini_bar, 150, 8);
+        lv_obj_align(use_mini_bar, LV_ALIGN_TOP_LEFT, 640 - 166, 136);
+        lv_obj_align(art_img_buddy, LV_ALIGN_TOP_LEFT, 40, 26);
+
+        lv_obj_align(zen_clk_lbl, LV_ALIGN_CENTER, 0, -18);
+        lv_obj_align(zen_date_lbl, LV_ALIGN_CENTER, 0, 26);
+        lv_obj_align(zen_foot_lbl, LV_ALIGN_BOTTOM_MID, 0, -8);
+        lv_obj_align(zen_batt_lbl, LV_ALIGN_TOP_RIGHT, -12, 10);
+
+        lv_obj_align(use_title_lbl, LV_ALIGN_TOP_LEFT, 24, 10);
+        lv_obj_align(use_pct_lbl, LV_ALIGN_TOP_LEFT, 24, 34);
+        lv_obj_set_width(use_detail_lbl, 165);
+        lv_obj_align(use_detail_lbl, LV_ALIGN_TOP_LEFT, 24, 96);
+        lv_obj_align(use_reset_lbl, LV_ALIGN_TOP_RIGHT, -30, 26);
+        lv_obj_set_size(use_bar, 380, 12);
+        lv_obj_align(use_bar, LV_ALIGN_TOP_RIGHT, -30, 44);
+        lv_obj_align(week_all_lbl, LV_ALIGN_TOP_RIGHT, -30, 70);
+        lv_obj_set_size(week_all_bar, 380, 12);
+        lv_obj_align(week_all_bar, LV_ALIGN_TOP_RIGHT, -30, 88);
+        lv_obj_align(week_mdl_lbl, LV_ALIGN_TOP_RIGHT, -30, 114);
+        lv_obj_set_size(week_mdl_bar, 380, 12);
+        lv_obj_align(week_mdl_bar, LV_ALIGN_TOP_RIGHT, -30, 132);
+        lv_obj_align(use_batt_lbl, LV_ALIGN_TOP_RIGHT, -30, 8);
+
+        lv_obj_align(stats_title_lbl, LV_ALIGN_TOP_LEFT, 24, 10);
+        lv_obj_align(cpu_lbl, LV_ALIGN_TOP_LEFT, 40, 42);
+        lv_obj_set_size(cpu_bar, 400, 14);
+        lv_obj_align(cpu_bar, LV_ALIGN_TOP_RIGHT, -40, 44);
+        lv_obj_align(ram_lbl, LV_ALIGN_TOP_LEFT, 40, 100);
+        lv_obj_set_size(ram_bar, 400, 14);
+        lv_obj_align(ram_bar, LV_ALIGN_TOP_RIGHT, -40, 102);
+        lv_obj_align(stats_batt_lbl, LV_ALIGN_TOP_RIGHT, -24, 8);
+
+        lv_obj_align(art_img_media, LV_ALIGN_TOP_LEFT, 14, 12);
+        lv_obj_align(med_app_lbl, LV_ALIGN_TOP_LEFT, 148, 12);
+        lv_obj_set_width(med_title_lbl, 290);
+        lv_obj_align(med_title_lbl, LV_ALIGN_TOP_LEFT, 148, 38);
+        lv_obj_set_width(med_artist_lbl, 290);
+        lv_obj_align(med_artist_lbl, LV_ALIGN_TOP_LEFT, 148, 70);
+        lv_obj_align(med_time_lbl, LV_ALIGN_TOP_LEFT, 148, 100);
+        lv_obj_align(dancer, LV_ALIGN_TOP_LEFT, 508, 16);
+        lv_obj_align(med_btn_prev, LV_ALIGN_TOP_RIGHT, -170, 92);
+        lv_obj_align(med_btn_play, LV_ALIGN_TOP_RIGHT, -98, 92);
+        lv_obj_align(med_btn_next, LV_ALIGN_TOP_RIGHT, -26, 92);
+        lv_obj_set_size(med_bar, 640 - 48, 6);
+        lv_obj_align(med_bar, LV_ALIGN_BOTTOM_MID, 0, -8);
+        lv_obj_align(med_batt_lbl, LV_ALIGN_TOP_RIGHT, -24, 8);
+
+        lv_obj_set_size(toast, 640 - 40, 64);
+        lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -10);
+        lv_obj_set_width(toast_lbl, 640 - 120);
+    } else {
+        /* portrait 172x640: everything stacks */
+        lv_obj_set_size(face_cont, 160, 150);
+        lv_obj_align(face_cont, LV_ALIGN_TOP_LEFT, 6, 6);
+        lv_obj_align(headline_lbl, LV_ALIGN_TOP_LEFT, 10, 168);
+        lv_obj_set_width(msg_lbl, 152);
+        lv_obj_align(msg_lbl, LV_ALIGN_TOP_LEFT, 10, 198);
+        lv_obj_align(proj_lbl, LV_ALIGN_TOP_LEFT, 10, 224);
+        for (int i = 0; i < 3; i++)
+            lv_obj_align(dots[i], LV_ALIGN_TOP_LEFT, 10 + i * 18, 250);
+        lv_obj_set_width(med_line_lbl, 152);
+        lv_obj_align(med_line_lbl, LV_ALIGN_TOP_LEFT, 10, 272);
+        lv_obj_align(clk_lbl, LV_ALIGN_TOP_LEFT, 10, 306);
+        lv_obj_align(date_lbl, LV_ALIGN_TOP_LEFT, 10, 342);
+        lv_obj_align(batt_lbl, LV_ALIGN_TOP_LEFT, 10, 360);
+        lv_obj_align(ctx_lbl, LV_ALIGN_TOP_LEFT, 10, 396);
+        lv_obj_set_size(ctx_bar, 152, 8);
+        lv_obj_align(ctx_bar, LV_ALIGN_TOP_LEFT, 10, 414);
+        lv_obj_align(use_mini_lbl, LV_ALIGN_TOP_LEFT, 10, 436);
+        lv_obj_set_size(use_mini_bar, 152, 8);
+        lv_obj_align(use_mini_bar, LV_ALIGN_TOP_LEFT, 10, 454);
+        lv_obj_align(art_img_buddy, LV_ALIGN_TOP_LEFT, 26, 20);
+
+        lv_obj_align(zen_clk_lbl, LV_ALIGN_TOP_MID, 0, 150);
+        lv_obj_align(zen_date_lbl, LV_ALIGN_TOP_MID, 0, 214);
+        lv_obj_align(zen_foot_lbl, LV_ALIGN_BOTTOM_MID, 0, -16);
+        lv_obj_align(zen_batt_lbl, LV_ALIGN_TOP_RIGHT, -8, 8);
+
+        lv_obj_align(use_title_lbl, LV_ALIGN_TOP_LEFT, 10, 8);
+        lv_obj_align(use_pct_lbl, LV_ALIGN_TOP_LEFT, 10, 32);
+        lv_obj_align(use_reset_lbl, LV_ALIGN_TOP_LEFT, 10, 96);
+        lv_obj_set_size(use_bar, 152, 12);
+        lv_obj_align(use_bar, LV_ALIGN_TOP_LEFT, 10, 116);
+        lv_obj_align(week_all_lbl, LV_ALIGN_TOP_LEFT, 10, 154);
+        lv_obj_set_size(week_all_bar, 152, 12);
+        lv_obj_align(week_all_bar, LV_ALIGN_TOP_LEFT, 10, 174);
+        lv_obj_align(week_mdl_lbl, LV_ALIGN_TOP_LEFT, 10, 212);
+        lv_obj_set_size(week_mdl_bar, 152, 12);
+        lv_obj_align(week_mdl_bar, LV_ALIGN_TOP_LEFT, 10, 232);
+        lv_obj_set_width(use_detail_lbl, 152);
+        lv_obj_align(use_detail_lbl, LV_ALIGN_TOP_LEFT, 10, 272);
+        lv_obj_align(use_batt_lbl, LV_ALIGN_BOTTOM_MID, 0, -10);
+
+        lv_obj_align(stats_title_lbl, LV_ALIGN_TOP_LEFT, 10, 8);
+        lv_obj_align(cpu_lbl, LV_ALIGN_TOP_LEFT, 10, 60);
+        lv_obj_set_size(cpu_bar, 152, 14);
+        lv_obj_align(cpu_bar, LV_ALIGN_TOP_LEFT, 10, 86);
+        lv_obj_align(ram_lbl, LV_ALIGN_TOP_LEFT, 10, 130);
+        lv_obj_set_size(ram_bar, 152, 14);
+        lv_obj_align(ram_bar, LV_ALIGN_TOP_LEFT, 10, 156);
+        lv_obj_align(stats_batt_lbl, LV_ALIGN_BOTTOM_MID, 0, -10);
+
+        lv_obj_align(art_img_media, LV_ALIGN_TOP_MID, 0, 8);
+        lv_obj_align(med_app_lbl, LV_ALIGN_TOP_LEFT, 10, 138);
+        lv_obj_set_width(med_title_lbl, 152);
+        lv_obj_align(med_title_lbl, LV_ALIGN_TOP_LEFT, 10, 162);
+        lv_obj_set_width(med_artist_lbl, 152);
+        lv_obj_align(med_artist_lbl, LV_ALIGN_TOP_LEFT, 10, 194);
+        lv_obj_align(med_time_lbl, LV_ALIGN_TOP_LEFT, 10, 220);
+        lv_obj_align(med_btn_prev, LV_ALIGN_TOP_LEFT, 8, 252);
+        lv_obj_align(med_btn_play, LV_ALIGN_TOP_MID, 0, 252);
+        lv_obj_align(med_btn_next, LV_ALIGN_TOP_RIGHT, -8, 252);
+        lv_obj_align(dancer, LV_ALIGN_TOP_MID, 0, 330);
+        lv_obj_set_size(med_bar, 148, 6);
+        lv_obj_align(med_bar, LV_ALIGN_BOTTOM_MID, 0, -10);
+        lv_obj_align(med_batt_lbl, LV_ALIGN_BOTTOM_MID, 0, -28);
+
+        lv_obj_set_size(toast, 148, 64);
+        lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -10);
+        lv_obj_set_width(toast_lbl, 88);
+    }
+}
+
+void buddy_set_orientation(int mode)
+{
+    static int cur = 0;
+    if (mode == cur) return;
+    cur = mode;
+    lv_display_t *disp = lv_display_get_default();
+    lv_display_set_rotation(disp,
+        mode == 0 ? LV_DISPLAY_ROTATION_270 :
+        mode == 1 ? LV_DISPLAY_ROTATION_0 :
+        mode == 2 ? LV_DISPLAY_ROTATION_180 : LV_DISPLAY_ROTATION_90);
+    layout_apply(mode == 1 || mode == 2);
 }
 
 void buddy_ui_init(void)

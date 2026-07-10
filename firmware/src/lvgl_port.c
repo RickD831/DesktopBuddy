@@ -52,6 +52,7 @@ static void example_lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
 #if (Rotated == USER_DISP_ROT_90)
   lv_display_rotation_t rotation = lv_display_get_rotation(disp);
   lv_area_t rotated_area;
+  uint16_t *src = (uint16_t *)color_p;   /* runtime rotation 0: flush directly */
   if(rotation != LV_DISPLAY_ROTATION_0)
   {
     lv_color_format_t cf = lv_display_get_color_format(disp);
@@ -63,6 +64,7 @@ static void example_lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
     int32_t src_h = lv_area_get_height(area);
     lv_draw_sw_rotate(color_p, lvgl_dest, src_w, src_h, src_stride, dest_stride, rotation, cf);
     area = &rotated_area;
+    src = (uint16_t *)lvgl_dest;
   }
 
   const int flush_coun = (LVGL_SPIRAM_BUFF_LEN / LVGL_DMA_BUFF_LEN);
@@ -73,7 +75,7 @@ static void example_lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uin
   int offsetx2 = EXAMPLE_LCD_H_RES;
   int offsety2 = offgap;
 
-  uint16_t *map = (uint16_t *)lvgl_dest;
+  uint16_t *map = src;
   xSemaphoreGive(flush_done_semaphore);
   for(int i = 0; i < flush_coun; i++)
   {

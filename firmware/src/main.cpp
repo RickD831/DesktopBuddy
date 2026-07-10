@@ -11,6 +11,7 @@
 #include "buddy_ui.h"
 #include "ble_link.h"
 #include "power_latch.h"
+#include "imu.h"
 #include "lcd_bl_bsp/lcd_bl_pwm_bsp.h"
 #include "mbedtls/base64.h"
 #include "esp_heap_caps.h"
@@ -89,6 +90,41 @@ static int batt_percent(int mv)
         }
     }
     return 0;
+}
+
+/* orientation from gravity: which way is the bar display standing? */
+static int imu_filt[3] = {0, 0, 0};
+static uint32_t last_imu_ms = 0;
+
+static void update_orientation(void)
+{
+    int16_t ax, ay, az;
+    if (!imu_read(&ax, &ay, &az)) return;
+    imu_filt[0] = (imu_filt[0] * 7 + ax * 3) / 10;
+    imu_filt[1] = (imu_filt[1] * 7 + ay * 3) / 10;
+    imu_filt[2] = (imu_filt[2] * 7 + az * 3) / 10;
+
+    /* X is the panel's long axis (measured: landscape stand reads x~0,
+       gravity split between y and z from the stand's back-lean).
+       Y's sign says which way up the landscape is. */
+    const int TH = 11500;   /* ~0.7 g of ~16384 LSB/g */
+    int want = 0;
+    if (imu_filt[0] > TH) want = 1;
+    else if (imu_filt[0] < -TH) want = 2;
+    else if (imu_filt[1] > 8000) want = 3;   /* landscape, upside down */
+
+    static int pend = 0, cnt = 0;
+    if (want == pend) {
+        if (cnt < 4 && ++cnt == 4) {
+            if (lvgl_port_lock(100)) {
+                buddy_set_orientation(want);
+                lvgl_port_unlock();
+            }
+        }
+    } else {
+        pend = want;
+        cnt = 0;
+    }
 }
 
 static void update_battery(void)
@@ -198,7 +234,11 @@ static void handle_line(const char *line)
     } else if (!strcmp(type, "art")) {
         handle_art(doc.as<JsonObject>());
     } else if (!strcmp(type, "ping")) {
-        send_reply("{\"t\":\"pong\",\"fw\":\"" FW_VERSION "\"}");
+        char buf[96];
+        snprintf(buf, sizeof(buf),
+                 "{\"t\":\"pong\",\"fw\":\"" FW_VERSION "\",\"imu\":[%d,%d,%d]}",
+                 imu_filt[0], imu_filt[1], imu_filt[2]);
+        send_reply(buf);
     }
 }
 
@@ -208,6 +248,7 @@ void setup()
     Serial.begin(115200);
     i2c_master_Init();
     power_latch_init();   /* grab battery power before the PWR button is released */
+    imu_init();
     lvgl_port_init();
     lcd_bl_pwm_bsp_init(LCD_PWM_MODE_255);
 
@@ -252,6 +293,11 @@ void loop()
     if (millis() - last_batt_ms > 5000) {
         last_batt_ms = millis();
         update_battery();
+    }
+
+    if (millis() - last_imu_ms > 250) {
+        last_imu_ms = millis();
+        update_orientation();
     }
 
     power_latch_poll();   /* hold PWR ~3s to power off on battery */

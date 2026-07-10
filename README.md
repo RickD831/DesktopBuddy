@@ -31,6 +31,12 @@ Long-press the face to pet the buddy. **Swipe down** on the buddy screen to
 peek the album art (it also peeks automatically on every track change).
 While music plays and the buddy is idle, it bobs its head along.
 
+**Stand it any way you like** — the onboard IMU detects orientation and the
+UI reflows automatically: landscape (either way up) or portrait (either end
+down) with vertical layouts for all five screens. Axis notes: the panel's
+long axis is accelerometer X; Y's sign distinguishes the two landscapes
+(the desk stand's back-lean puts ~0.7 g on Y).
+
 ## Moods
 
 Blinks and looks around when idle; focuses with typing dots while Claude
