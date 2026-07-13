@@ -6,14 +6,9 @@ Claude Code is doing on your Windows PC — plus your official Claude usage
 limits, context-window gauge, clock, battery and PC stats. Works over USB or
 Bluetooth LE (battery powered).
 
-```
-┌──────────┬──────────────────────────┬───────────────┐
-│  ^   ^   │  Claude is working       │  14:32  ⚡🔋📶 │
-│  o   o   │  Edit: main.cpp          │   Wed Jul 09  │
-│   ___    │  Desktop Buddy           │ context ▓▓▓░  │
-│  \___/   │  ● ● ●                   │  323k / 1.0M  │
-└──────────┴──────────────────────────┴───────────────┘
-```
+<p align="center">
+  <img src="docs/MainScreenIdle.png" width="640" alt="Claude Buddy standing by, idle screen">
+</p>
 
 ## Screens (tap to cycle)
 
@@ -26,6 +21,10 @@ Bluetooth LE (battery powered).
 5. **Now playing** — album art, track/artist, smooth progress bar, working
    ⏮ ⏯ ⏭ buttons (controls Spotify, YouTube, anything with a Windows media
    card), and a headphoned buddy that sways, blinks and twirls to the music
+
+| Buddy (working) | Claude usage | PC stats | Now playing |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/MainScreen.png" width="200"> | <img src="docs/UsageScreen.png" width="200"> | <img src="docs/PCStatsScreen.png" width="200"> | <img src="docs/NowPlayingScreen.png" width="200"> |
 
 Long-press the face to pet the buddy. **Swipe down** on the buddy screen to
 peek the album art (it also peeks automatically on every track change).
