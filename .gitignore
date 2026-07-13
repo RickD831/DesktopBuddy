@@ -8,3 +8,5 @@ companion/buddy.log
 
 # personal overrides (safe to commit, but machine-specific)
 companion/buddy_config.json
+
+.venv/

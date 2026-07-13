@@ -1,6 +1,7 @@
 @echo off
-rem Claude Buddy companion launcher
+rem Claude Buddy companion launcher (visible console)
 cd /d "%~dp0"
-python -c "import serial, psutil" 2>nul || python -m pip install --user -r requirements.txt
-python buddy_companion.py %*
+set "PY=%~dp0..\.venv\Scripts\python.exe"
+if not exist "%PY%" set "PY=python"
+"%PY%" buddy_companion.py %*
 pause
