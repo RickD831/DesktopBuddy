@@ -314,7 +314,9 @@ class ClaudeWatcher:
                 if ctx <= 0:
                     continue
                 model = str(msg.get("model", "")).lower()
-                window = 1_000_000 if ("fable" in model or "1m" in model) else 200_000
+                # every current Claude model has a 1M context window by default
+                # except Haiku, which stays at 200k
+                window = 200_000 if "haiku" in model else 1_000_000
                 pct = round(ctx / window * 100)
                 return pct, f"{_fmt_tokens(ctx)} / {_fmt_tokens(window)}"
             except (json.JSONDecodeError, TypeError, ValueError):
