@@ -67,13 +67,22 @@ cd firmware
 First-time flash on a factory board: hold BOOT, tap PWR, release BOOT.
 After that, flashing needs no buttons.
 
-**Companion**: `pip install -r companion/requirements.txt`, then run
-`companion\run_buddy.bat` — or nothing at all: `start_buddy_hidden.vbs`
-is installed in `shell:startup`, so it launches silently at login
-(log: `companion\buddy.log`).
+**Companion**: runs from a self-contained virtualenv at `.venv/` (not your
+system Python — the login environment can't see user-installed packages
+reliably). One-time setup: `python -m venv .venv` then
+`.venv\Scripts\pip install -r companion\requirements.txt`. After that:
+
+| Action | How |
+|---|---|
+| Start (silent) | double-click `companion\start_buddy_hidden.vbs` |
+| Start (visible console) | double-click `companion\run_buddy.bat` |
+| Stop | double-click `companion\stop_buddy.bat` |
+| Automatic | already installed in `shell:startup` — starts itself at login |
+
 It auto-detects the board on USB (Espressif VID) and falls back to
 Bluetooth LE ("ClaudeBuddy", Nordic UART service) when unplugged — with a
-30 s heartbeat that forces a reconnect if the link goes silent.
+30 s heartbeat that forces a reconnect if the link goes silent. Log:
+`companion\buddy.log`.
 
 **Battery**: hold PWR ~2 s to power on (firmware latches power via the
 TCA9554 expander), hold ~3 s to power off. Battery %, charge state and
@@ -85,7 +94,7 @@ USB/BLE link show top-right on every screen.
 |---|---|
 | Official 5-hour / weekly limits | `GET api.anthropic.com/api/oauth/usage` with the OAuth token from `~/.claude/.credentials.json` (polled every 5 min; token auto-refreshed via `platform.claude.com/v1/oauth/token` and persisted back) |
 | Live mood / tool activity | Claude Code hooks (PreToolUse, UserPromptSubmit, Notification, Stop) registered in `~/.claude/settings.json` → `buddy_hook.py` → `~/.claude/buddy_events.jsonl` |
-| Context-window gauge | Last assistant turn's token usage in the newest transcript (`~/.claude/projects/**/*.jsonl`); window 1M for Fable, 200k otherwise |
+| Context-window gauge | Last assistant turn's token usage in the newest transcript (`~/.claude/projects/**/*.jsonl`); window is 1M for every current model except Haiku (200k) |
 | Token totals / fallback gauge | Transcript parsing (5-hour blocks; limit auto-estimated, override in `companion/buddy_config.json`: `{"block_limit_tokens": N}`) |
 | Daily cost | Claude Code OpenTelemetry → companion's OTLP listener on `127.0.0.1:4318` (env vars in `~/.claude/settings.json`) |
 | Now playing + controls | Windows system media API (SMTC, `winrt` packages) — any app with a media card, no service API keys. Position is extrapolated from the player's last report (web players freeze theirs). Album art: thumbnail → 120×120 RGB565, streamed in paced base64 chunks |
@@ -136,6 +145,5 @@ play/next/prev), `artok`/`artdrop` (art transfer receipts).
 - Battery-saver mood on BLE (dimmer backlight, slower updates)
 - Pomodoro timer screen (touch to start/stop)
 - Build/test results pushed as toasts from CI
-- Use the onboard IMU: react when you pick the display up
 - Speech bubble showing Claude's last reply summary
 - Wi-Fi mode (companion streams over TCP, no BT needed)
