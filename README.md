@@ -1,4 +1,4 @@
-# Claude Buddy
+# Desktop Buddy
 
 A desk companion for the **Waveshare ESP32-S3-Touch-LCD-3.49** (172x640 bar
 display). Two little animated faces live on the display — one for Claude
