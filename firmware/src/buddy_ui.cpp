@@ -1,4 +1,4 @@
-/* Claude Buddy UI — 640x172 landscape, LVGL 9.
+/* Desktop Buddy UI — 640x172 landscape, LVGL 9.
  *
  * Screen 0 "buddy":     Claude/Codex face(s) | status text | clock +
  *                       context/usage gauges (see update_dual_layout())

@@ -1,5 +1,5 @@
 /**
- * Minimal LVGL 9 configuration for Claude Buddy.
+ * Minimal LVGL 9 configuration for Desktop Buddy.
  * Anything not set here falls back to LVGL's defaults (lv_conf_internal.h).
  */
 #ifndef LV_CONF_H

@@ -1,4 +1,4 @@
-"""Claude Buddy companion — feeds the Waveshare ESP32-S3 buddy display.
+"""Desktop Buddy companion — feeds the Waveshare ESP32-S3 buddy display.
 
 Runs on Windows. Every couple of seconds it sends a JSON status line over
 USB serial: CPU/RAM usage, clock, what Claude Code is currently doing
@@ -1212,7 +1212,7 @@ def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None,
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Claude Buddy companion")
+    ap = argparse.ArgumentParser(description="Desktop Buddy companion")
     ap.add_argument("--port", help="COM port (default: auto-detect ESP32-S3)")
     ap.add_argument("--ble", action="store_true", help="force Bluetooth LE")
     args = ap.parse_args()

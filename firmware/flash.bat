@@ -1,5 +1,5 @@
 @echo off
-rem Build and flash the Claude Buddy firmware.
+rem Build and flash the Desktop Buddy firmware.
 rem First-time flash: hold BOOT, tap PWR/RESET, release BOOT, then run this.
 cd /d "%~dp0"
 set PYTHONNOUSERSITE=

@@ -8,7 +8,7 @@ clock, battery and PC stats. Works over USB or Bluetooth LE (battery
 powered).
 
 <p align="center">
-  <img src="docs/MainScreenIdle.png" width="640" alt="Claude Buddy standing by, idle screen">
+  <img src="docs/MainScreenIdle.png" width="640" alt="Desktop Buddy standing by, idle screen">
 </p>
 
 ## Screens (tap to cycle)

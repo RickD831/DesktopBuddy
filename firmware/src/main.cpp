@@ -1,4 +1,4 @@
-/* Claude Buddy — main firmware entry.
+/* Desktop Buddy — main firmware entry.
  *
  * Listens for newline-delimited JSON from the Windows companion app over
  * native USB CDC and drives the buddy UI. See README.md for the protocol.

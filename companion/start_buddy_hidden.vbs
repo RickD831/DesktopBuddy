@@ -1,4 +1,4 @@
-' Launches the Claude Buddy companion invisibly (used from shell:startup).
+' Launches the Desktop Buddy companion invisibly (used from shell:startup).
 Set sh = CreateObject("WScript.Shell")
 dir = "C:\Users\rdenoyer\code\applications\Desktop Buddy\companion"
 py = "C:\Users\rdenoyer\code\applications\Desktop Buddy\.venv\Scripts\python.exe"
