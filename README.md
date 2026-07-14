@@ -32,6 +32,10 @@ powered).
 |:---:|:---:|:---:|:---:|
 | <img src="docs/MainScreen.png" width="200"> | <img src="docs/UsageScreen.png" width="200"> | <img src="docs/PCStatsScreen.png" width="200"> | <img src="docs/NowPlayingScreen.png" width="200"> |
 
+| Codex solo | Both stacked |
+|:---:|:---:|
+| <img src="docs/MainScreenCodex.png" width="260"> | <img src="docs/MainScreenBoth.png" width="260"> |
+
 ### Dual-face layout
 
 Claude's face keeps its full 6-mood range (idle/working/waiting/happy/error/
@@ -63,9 +67,13 @@ While music plays and the buddy is idle, it bobs its head along.
 
 **Stand it any way you like** — the onboard IMU detects orientation and the
 UI reflows automatically: landscape (either way up) or portrait (either end
-down) with vertical layouts for all five screens. Axis notes: the panel's
+down) with vertical layouts for all six screens. Axis notes: the panel's
 long axis is accelerometer X; Y's sign distinguishes the two landscapes
 (the desk stand's back-lean puts ~0.7 g on Y).
+
+| Portrait — buddy | Portrait — now playing |
+|:---:|:---:|
+| <img src="docs/Vertical.png" width="200"> | <img src="docs/VerticalPlayer.png" width="200"> |
 
 ## Moods
 
