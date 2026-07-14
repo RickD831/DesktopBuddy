@@ -16,6 +16,7 @@
     --face-eye: #F2EFEA;
     --code-bg: #1A1A2E;
     --code-ink: #D6D3CC;
+    --codex: #4A90D9;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -34,19 +35,20 @@
       --face-eye: #F2EFEA;
       --code-bg: #14141F;
       --code-ink: #C9C7C1;
+      --codex: #4A90D9;
     }
   }
   :root[data-theme="dark"] {
     --bg: #0F0F1A; --panel: #1A1A2E; --panel2: #14141F; --ink: #E8E5DE;
     --dim: #8E8C98; --line: #2E2E44; --accent: #D97757; --green: #7BC47F;
     --amber: #E5A84B; --red: #E5484D; --eye: #F2EFEA; --facebg: #1A1A2E;
-    --face-eye: #F2EFEA; --code-bg: #14141F; --code-ink: #C9C7C1;
+    --face-eye: #F2EFEA; --code-bg: #14141F; --code-ink: #C9C7C1; --codex: #4A90D9;
   }
   :root[data-theme="light"] {
     --bg: #F6F2EC; --panel: #FFFFFF; --panel2: #EFEAE1; --ink: #23233A;
     --dim: #6E6C78; --line: #D8D2C6; --accent: #C96442; --green: #4E9455;
     --amber: #B07C1F; --red: #C13B40; --eye: #23233A; --facebg: #1A1A2E;
-    --face-eye: #F2EFEA; --code-bg: #1A1A2E; --code-ink: #D6D3CC;
+    --face-eye: #F2EFEA; --code-bg: #1A1A2E; --code-ink: #D6D3CC; --codex: #4A90D9;
   }
 
   * { box-sizing: border-box; }
@@ -147,26 +149,39 @@
       <path d="M 74 104 Q 100 124 126 104" stroke="var(--face-eye)" stroke-width="6" fill="none" stroke-linecap="round"/>
     </svg>
   </div>
+  <div class="hero-face" aria-hidden="true" style="margin-left:-8px">
+    <svg width="96" height="72" viewBox="0 0 200 150">
+      <rect x="4" y="4" width="192" height="142" rx="18" fill="var(--facebg)" stroke="var(--codex)" stroke-width="3"/>
+      <rect x="52" y="38" width="26" height="44" rx="13" fill="var(--face-eye)"/>
+      <rect x="122" y="38" width="26" height="44" rx="13" fill="var(--face-eye)"/>
+      <circle cx="67" cy="60" r="6" fill="#14141F"/>
+      <circle cx="137" cy="60" r="6" fill="#14141F"/>
+      <path d="M 74 104 Q 100 124 126 104" stroke="var(--face-eye)" stroke-width="6" fill="none" stroke-linecap="round"/>
+    </svg>
+  </div>
   <div>
     <h1>Claude Buddy — how it's built</h1>
     <p class="sub">A 172×640 touchscreen on an ESP32-S3, fed by a Python companion on the PC.
-    Three programs, two radios, one little face. Here's every moving part.</p>
+    Two agents, one little screen. Claude gets the orange face, Codex CLI gets the blue one —
+    whichever is idle steps aside so the busy one gets the full stage; if both are working at
+    once, they share it. Here's every moving part.</p>
   </div>
 </header>
 
 <h2>The big picture</h2>
-<p class="sub">Data flows left to right: Anthropic's cloud and Claude Code's local files feed the
+<p class="sub">Data flows left to right: Anthropic's cloud and both agents' local files feed the
 companion, which condenses everything into one small JSON frame every 2 seconds and ships it
-to the display over whichever link is available.</p>
+to the display over whichever link is available. Codex needs no cloud API at all — its own
+session logs already carry OpenAI's rate-limit numbers.</p>
 
 <div class="diagram-wrap card">
-<svg viewBox="0 0 940 400" role="img" aria-label="Architecture: cloud and Claude Code feed the companion, which sends frames to the ESP32 over USB or BLE">
+<svg viewBox="0 0 940 460" role="img" aria-label="Architecture: cloud, Claude Code, and Codex CLI feed the companion, which sends frames to the ESP32 over USB or BLE">
   <!-- zone headers -->
   <text x="90" y="26" fill="var(--dim)" font-size="12" letter-spacing="2">ANTHROPIC CLOUD</text>
   <text x="330" y="26" fill="var(--dim)" font-size="12" letter-spacing="2">YOUR PC</text>
   <text x="760" y="26" fill="var(--dim)" font-size="12" letter-spacing="2">THE BUDDY</text>
-  <line x1="255" y1="14" x2="255" y2="390" stroke="var(--line)" stroke-dasharray="4 5"/>
-  <line x1="690" y1="14" x2="690" y2="390" stroke="var(--line)" stroke-dasharray="4 5"/>
+  <line x1="255" y1="14" x2="255" y2="450" stroke="var(--line)" stroke-dasharray="4 5"/>
+  <line x1="690" y1="14" x2="690" y2="450" stroke="var(--line)" stroke-dasharray="4 5"/>
 
   <!-- cloud: usage api -->
   <rect x="30" y="46" width="195" height="64" rx="10" fill="var(--panel2)" stroke="var(--line)"/>
@@ -178,7 +193,7 @@ to the display over whichever link is available.</p>
   <text x="301" y="72" fill="var(--ink)" font-size="13">Claude Code</text>
   <text x="301" y="92" fill="var(--dim)" font-size="10.5">the thing doing the work</text>
 
-  <!-- three local sources -->
+  <!-- four Claude-side local sources -->
   <rect x="285" y="132" width="180" height="46" rx="8" fill="var(--panel2)" stroke="var(--line)"/>
   <text x="301" y="151" fill="var(--ink)" font-size="12">transcripts (.jsonl)</text>
   <text x="301" y="168" fill="var(--dim)" font-size="10">tokens · activity · context</text>
@@ -195,21 +210,30 @@ to the display over whichever link is available.</p>
   <text x="301" y="325" fill="var(--ink)" font-size="12">system media (SMTC)</text>
   <text x="301" y="342" fill="var(--dim)" font-size="10">Spotify / YouTube / anything</text>
 
-  <!-- claude code feeds the three -->
+  <!-- Codex CLI: its own agent + one local source, no cloud call -->
+  <rect x="285" y="364" width="180" height="76" rx="8" fill="var(--panel2)" stroke="var(--codex)"/>
+  <text x="301" y="386" fill="var(--codex)" font-size="12.5">Codex CLI</text>
+  <text x="301" y="405" fill="var(--ink)" font-size="10.5">session logs (.jsonl)</text>
+  <text x="301" y="422" fill="var(--dim)" font-size="9.5">~/.codex/sessions — tokens,</text>
+  <text x="301" y="434" fill="var(--dim)" font-size="9.5">rate limit % and activity, no API</text>
+
+  <!-- claude code feeds the four -->
   <path d="M 375 110 L 375 132" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
   <path d="M 350 110 C 330 118 325 170 337 190" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
   <path d="M 330 110 C 300 130 295 215 320 248" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
   <path d="M 465 329 C 495 329 500 290 510 272" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
 
   <!-- companion -->
-  <rect x="510" y="120" width="155" height="160" rx="12" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+  <rect x="510" y="120" width="155" height="200" rx="12" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
   <text x="530" y="147" fill="var(--accent)" font-size="14">companion</text>
   <text x="530" y="164" fill="var(--dim)" font-size="10.5">buddy_companion.py</text>
-  <text x="530" y="190" fill="var(--ink)" font-size="10.5">· watches sources</text>
+  <text x="530" y="190" fill="var(--ink)" font-size="10.5">· watches both agents</text>
   <text x="530" y="207" fill="var(--ink)" font-size="10.5">· builds status frame, 2 s</text>
   <text x="530" y="224" fill="var(--ink)" font-size="10.5">· streams album art</text>
   <text x="530" y="241" fill="var(--ink)" font-size="10.5">· relays media commands</text>
   <text x="530" y="258" fill="var(--ink)" font-size="10.5">· heartbeat + reconnect</text>
+  <text x="530" y="275" fill="var(--ink)" font-size="10.5">· one frame, both faces' data</text>
+  <text x="530" y="292" fill="var(--ink)" font-size="10.5">· ClaudeWatcher + CodexWatcher</text>
 
   <!-- sources -> companion -->
   <path d="M 225 78 C 400 78 430 150 510 158" stroke="var(--green)" fill="none" marker-end="url(#arrg)"/>
@@ -217,33 +241,38 @@ to the display over whichever link is available.</p>
   <path d="M 465 155 L 510 172" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
   <path d="M 465 213 L 510 213" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
   <path d="M 465 271 L 510 248" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
+  <path d="M 465 402 C 495 402 500 320 510 300" stroke="var(--codex)" fill="none" marker-end="url(#arrc)"/>
 
   <!-- transports -->
-  <path d="M 665 175 L 725 175" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#arro)"/>
-  <text x="672" y="165" fill="var(--accent)" font-size="10.5">USB serial</text>
-  <path d="M 665 235 L 725 235" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#arro)"/>
-  <text x="672" y="258" fill="var(--accent)" font-size="10.5">Bluetooth LE</text>
-  <text x="672" y="271" fill="var(--dim)" font-size="9.5">fallback, no cable</text>
+  <path d="M 665 195 L 725 195" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#arro)"/>
+  <text x="672" y="185" fill="var(--accent)" font-size="10.5">USB serial</text>
+  <path d="M 665 255 L 725 255" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#arro)"/>
+  <text x="672" y="278" fill="var(--accent)" font-size="10.5">Bluetooth LE</text>
+  <text x="672" y="291" fill="var(--dim)" font-size="9.5">fallback, no cable</text>
 
   <!-- ESP32 device -->
-  <rect x="725" y="96" width="185" height="230" rx="12" fill="var(--panel2)" stroke="var(--line)"/>
+  <rect x="725" y="96" width="185" height="290" rx="12" fill="var(--panel2)" stroke="var(--line)"/>
   <text x="742" y="122" fill="var(--ink)" font-size="13">ESP32-S3 firmware</text>
   <rect x="742" y="138" width="152" height="34" rx="6" fill="var(--panel)" stroke="var(--line)"/>
   <text x="752" y="160" fill="var(--ink)" font-size="11">main.cpp — protocol</text>
   <rect x="742" y="180" width="152" height="34" rx="6" fill="var(--panel)" stroke="var(--line)"/>
-  <text x="752" y="202" fill="var(--ink)" font-size="11">buddy_ui — LVGL face</text>
+  <text x="752" y="202" fill="var(--ink)" font-size="11">buddy_ui — 2 LVGL faces</text>
   <rect x="742" y="222" width="152" height="34" rx="6" fill="var(--panel)" stroke="var(--line)"/>
   <text x="752" y="244" fill="var(--ink)" font-size="11">lvgl_port — panel/touch</text>
   <rect x="742" y="264" width="152" height="34" rx="6" fill="var(--panel)" stroke="var(--line)"/>
   <text x="752" y="286" fill="var(--ink)" font-size="11">ble + power + battery</text>
 
-  <!-- screen -->
-  <rect x="742" y="344" width="152" height="34" rx="8" fill="var(--facebg)" stroke="var(--accent)" stroke-width="1.5"/>
-  <circle cx="768" cy="361" r="4" fill="var(--face-eye)"/>
-  <circle cx="786" cy="361" r="4" fill="var(--face-eye)"/>
-  <path d="M 766 369 Q 777 375 788 369" stroke="var(--face-eye)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-  <text x="812" y="366" fill="var(--dim)" font-size="10">172×640 IPS</text>
-  <path d="M 818 326 L 818 344" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
+  <!-- screen: shows either face, or both stacked -->
+  <rect x="742" y="330" width="70" height="44" rx="8" fill="var(--facebg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <circle cx="760" cy="348" r="3.4" fill="var(--face-eye)"/>
+  <circle cx="774" cy="348" r="3.4" fill="var(--face-eye)"/>
+  <path d="M 758 358 Q 767 363 776 358" stroke="var(--face-eye)" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <rect x="820" y="330" width="70" height="44" rx="8" fill="var(--facebg)" stroke="var(--codex)" stroke-width="1.5"/>
+  <circle cx="838" cy="348" r="3.4" fill="var(--face-eye)"/>
+  <circle cx="852" cy="348" r="3.4" fill="var(--face-eye)"/>
+  <path d="M 836 358 Q 845 363 854 358" stroke="var(--face-eye)" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <text x="742" y="390" fill="var(--dim)" font-size="10">172×640 IPS · either face full-size, or both stacked</text>
+  <path d="M 818 316 L 818 330" stroke="var(--dim)" fill="none" marker-end="url(#arr)"/>
 
   <defs>
     <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
@@ -252,6 +281,8 @@ to the display over whichever link is available.</p>
       <path d="M0,0 L8,4 L0,8 z" fill="var(--green)"/></marker>
     <marker id="arro" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
       <path d="M0,0 L8,4 L0,8 z" fill="var(--accent)"/></marker>
+    <marker id="arrc" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="var(--codex)"/></marker>
   </defs>
 </svg>
 <div class="legend">
@@ -262,7 +293,7 @@ to the display over whichever link is available.</p>
 </div>
 
 <h2>Where each number comes from</h2>
-<p class="sub">Four independent sources, each used for what it's uniquely good at. If one
+<p class="sub">Independent sources, each used for what it's uniquely good at. If one
 disappears, the others keep working.</p>
 <div class="card table-wrap">
 <table>
@@ -270,22 +301,27 @@ disappears, the others keep working.</p>
   <tr>
     <td>Official usage API</td>
     <td>OAuth token from <code>~/.claude/.credentials.json</code>, polled every 5 min, auto-refreshed</td>
-    <td>The three limit bars: 5-hour block, weekly all-models, weekly current-model — identical to the app's panel</td>
+    <td>Claude's three limit bars: 5-hour block, weekly all-models, weekly current-model — identical to the app's panel</td>
   </tr>
   <tr>
     <td>Hooks</td>
     <td>Claude Code fires <code>buddy_hook.py</code> on every tool use, prompt, notification and stop; it appends one line to an events file</td>
-    <td>Instant mood changes — <em>working</em> with the tool's name, wide-eyed <em>waiting</em> the moment a permission prompt appears, <em>done</em> smile</td>
+    <td>Instant Claude mood changes — <em>working</em> with the tool's name, wide-eyed <em>waiting</em> the moment a permission prompt appears, <em>done</em> smile</td>
   </tr>
   <tr>
     <td>Transcripts</td>
     <td>Tails <code>~/.claude/projects/**/*.jsonl</code> — every response logs exact token counts</td>
-    <td>Context-window gauge, active project name, multi-session count, fallback activity detection</td>
+    <td>Claude's context-window gauge, active project name, multi-session count, fallback activity detection</td>
   </tr>
   <tr>
     <td>OpenTelemetry</td>
     <td>Claude Code pushes metrics to the companion's listener on <code>localhost:4318</code></td>
-    <td>Today's dollar cost on the usage screen</td>
+    <td>Today's dollar cost on the Claude usage screen</td>
+  </tr>
+  <tr>
+    <td style="color:var(--codex)">Codex session logs</td>
+    <td>Tails the newest <code>~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl</code> — no API/OAuth at all. Per-turn <code>token_count</code> events carry both <code>last_token_usage</code> (context fill — <code>total_token_usage</code> is a cumulative session total and looks wrong) and OpenAI's own <code>rate_limits.primary.used_percent</code></td>
+    <td>Codex's context gauge, usage bar + reset countdown, and mtime-based activity (working/done/idle only — no reliable "needs approval" signal exists in the logs, so no waiting/error mood for Codex)</td>
   </tr>
   <tr>
     <td>System media (SMTC)</td>
@@ -307,7 +343,12 @@ and Bluetooth. The firmware never talks to the network; it just renders what it'
   <span class="k">"use"</span>: { <span class="k">"pct"</span>:<span class="v">56</span>, <span class="k">"rst"</span>:<span class="v">"4h 19m"</span>,        <span class="cm">// 5-hour block</span>
            <span class="k">"w"</span>:<span class="v">38</span>, <span class="k">"wm"</span>:<span class="v">61</span>, <span class="k">"wrst"</span>:<span class="v">"Jul 12"</span>, <span class="cm">// weekly bars</span>
            <span class="k">"day"</span>:<span class="v">"41M tok · $12.40"</span> },
-  <span class="k">"cpu"</span>:<span class="v">31</span>, <span class="k">"ram"</span>:<span class="v">62</span>, <span class="k">"clk"</span>:<span class="v">"14:32"</span>, <span class="k">"date"</span>:<span class="v">"Wed Jul 09"</span> }
+  <span class="k">"cpu"</span>:<span class="v">31</span>, <span class="k">"ram"</span>:<span class="v">62</span>, <span class="k">"clk"</span>:<span class="v">"14:32"</span>, <span class="k">"date"</span>:<span class="v">"Wed Jul 09"</span>,
+
+  <span class="k">"cdx"</span>: { <span class="k">"ctx"</span>:<span class="v">24</span>, <span class="k">"ctxt"</span>:<span class="v">"63k / 258k"</span>,       <span class="cm">// Codex context gauge</span>
+           <span class="k">"pct"</span>:<span class="v">3</span>, <span class="k">"rst"</span>:<span class="v">"6d 20h"</span>,             <span class="cm">// Codex rate-limit window</span>
+           <span class="k">"state"</span>:<span class="v">"working"</span>, <span class="k">"head"</span>:<span class="v">"Codex is working"</span>,
+           <span class="k">"msg"</span>:<span class="v">"using wait"</span>, <span class="k">"proj"</span>:<span class="v">"my-app"</span> },
 
   <span class="k">"med"</span>: { <span class="k">"st"</span>:<span class="v">"playing"</span>, <span class="k">"t"</span>:<span class="v">"Real Love Baby"</span>,       <span class="cm">// now playing</span>
            <span class="k">"a"</span>:<span class="v">"Father John Misty"</span>, <span class="k">"pos"</span>:<span class="v">143</span>, <span class="k">"dur"</span>:<span class="v">221</span> } }
@@ -319,11 +360,11 @@ and Bluetooth. The firmware never talks to the network; it just renders what it'
 <span class="cm">//              {"t":"mc","cmd":"play|next|prev"} from the transport buttons</span>
 <span class="cm">// 30 s of silence → companion reconnects · 30 s without frames → buddy sleeps</span></pre>
 
-<h2>The five screens</h2>
+<h2>The six screens</h2>
 <p class="sub">Tap anywhere (outside the face and buttons) to cycle. Battery, charge state
 and the USB/Bluetooth link icon ride along in the corner of every screen.</p>
 <div class="diagram-wrap card">
-<svg viewBox="0 0 940 128" role="img" aria-label="Five screens: buddy, zen clock, claude usage, pc stats, now playing">
+<svg viewBox="0 0 1150 128" role="img" aria-label="Six screens: buddy, zen clock, claude usage, codex usage, pc stats, now playing">
   <!-- screen 1: buddy -->
   <rect x="6" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
   <rect x="18" y="28" width="8" height="18" rx="4" fill="var(--face-eye)"/>
@@ -336,7 +377,7 @@ and the USB/Bluetooth link icon ride along in the corner of every screen.</p>
   <rect x="128" y="46" width="40" height="4" rx="2" fill="var(--green)"/>
   <rect x="128" y="58" width="40" height="4" rx="2" fill="var(--amber)"/>
   <text x="6" y="102" fill="var(--ink)" font-size="12">1 · buddy</text>
-  <text x="6" y="117" fill="var(--dim)" font-size="10">face · gauges · ♪ ticker</text>
+  <text x="6" y="117" fill="var(--dim)" font-size="10">face(s) · gauges · ♪ ticker</text>
 
   <!-- screen 2: zen -->
   <rect x="196" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
@@ -344,7 +385,7 @@ and the USB/Bluetooth link icon ride along in the corner of every screen.</p>
   <text x="196" y="102" fill="var(--ink)" font-size="12">2 · zen clock</text>
   <text x="196" y="117" fill="var(--dim)" font-size="10">just the time</text>
 
-  <!-- screen 3: usage -->
+  <!-- screen 3: claude usage -->
   <rect x="386" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
   <text x="398" y="40" fill="var(--face-eye)" font-size="15">56%</text>
   <rect x="444" y="26" width="102" height="6" rx="3" fill="var(--amber)"/>
@@ -353,30 +394,40 @@ and the USB/Bluetooth link icon ride along in the corner of every screen.</p>
   <text x="386" y="102" fill="var(--ink)" font-size="12">3 · claude usage</text>
   <text x="386" y="117" fill="var(--dim)" font-size="10">5-hour + weekly bars</text>
 
-  <!-- screen 4: pc stats -->
-  <rect x="576" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
-  <text x="588" y="38" fill="#8E8C98" font-size="9">CPU</text>
-  <rect x="614" y="30" width="110" height="7" rx="3.5" fill="var(--accent)"/>
-  <text x="588" y="62" fill="#8E8C98" font-size="9">RAM</text>
-  <rect x="614" y="54" width="82" height="7" rx="3.5" fill="#8E8C98"/>
-  <text x="576" y="102" fill="var(--ink)" font-size="12">4 · pc stats</text>
-  <text x="576" y="117" fill="var(--dim)" font-size="10">cpu · ram</text>
+  <!-- screen 4: codex usage -->
+  <rect x="576" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--codex)"/>
+  <text x="588" y="40" fill="var(--codex)" font-size="15">3%</text>
+  <rect x="628" y="34" width="102" height="6" rx="3" fill="var(--green)"/>
+  <text x="588" y="62" fill="var(--dim)" font-size="9">ctx 63k / 258k</text>
+  <text x="576" y="102" fill="var(--ink)" font-size="12">4 · codex usage</text>
+  <text x="576" y="117" fill="var(--dim)" font-size="10">single rate-limit bar + context</text>
 
-  <!-- screen 5: now playing -->
+  <!-- screen 5: pc stats -->
   <rect x="766" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
-  <rect x="776" y="22" width="34" height="34" rx="4" fill="var(--accent)" opacity="0.55"/>
-  <rect x="818" y="26" width="66" height="6" rx="3" fill="var(--face-eye)"/>
-  <rect x="818" y="38" width="44" height="4" rx="2" fill="#8E8C98"/>
-  <text x="884" y="56" fill="var(--face-eye)" font-size="9">⏮ ⏯ ⏭</text>
-  <rect x="776" y="66" width="152" height="4" rx="2" fill="var(--accent)"/>
-  <text x="766" y="102" fill="var(--ink)" font-size="12">5 · now playing</text>
-  <text x="766" y="117" fill="var(--dim)" font-size="10">art · controls · dancer</text>
+  <text x="778" y="38" fill="#8E8C98" font-size="9">CPU</text>
+  <rect x="804" y="30" width="110" height="7" rx="3.5" fill="var(--accent)"/>
+  <text x="778" y="62" fill="#8E8C98" font-size="9">RAM</text>
+  <rect x="804" y="54" width="82" height="7" rx="3.5" fill="#8E8C98"/>
+  <text x="766" y="102" fill="var(--ink)" font-size="12">5 · pc stats</text>
+  <text x="766" y="117" fill="var(--dim)" font-size="10">cpu · ram</text>
+
+  <!-- screen 6: now playing -->
+  <rect x="956" y="14" width="172" height="64" rx="8" fill="var(--facebg)" stroke="var(--line)"/>
+  <rect x="966" y="22" width="34" height="34" rx="4" fill="var(--accent)" opacity="0.55"/>
+  <rect x="1008" y="26" width="66" height="6" rx="3" fill="var(--face-eye)"/>
+  <rect x="1008" y="38" width="44" height="4" rx="2" fill="#8E8C98"/>
+  <text x="1074" y="56" fill="var(--face-eye)" font-size="9">⏮ ⏯ ⏭</text>
+  <rect x="966" y="66" width="152" height="4" rx="2" fill="var(--accent)"/>
+  <text x="956" y="102" fill="var(--ink)" font-size="12">6 · now playing</text>
+  <text x="956" y="117" fill="var(--dim)" font-size="10">art · controls · dancer</text>
 </svg>
 </div>
 
 <h2>Moods</h2>
 <p class="sub">The face is state, not decoration — each expression maps to a real signal.
-Long-press the face any time to pet the buddy (it says thanks).</p>
+Long-press the face any time to pet the buddy (it says thanks). These six are Claude's; Codex
+gets a deliberately smaller set (below) since its session logs don't carry a "needs approval"
+signal the way Claude Code's hooks do.</p>
 <div class="moods">
   <div class="mood">
     <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)"/>
@@ -432,12 +483,76 @@ Long-press the face any time to pet the buddy (it says thanks).</p>
   </div>
 </div>
 
+<h3 style="font-size:14px;color:var(--codex);margin:26px 0 10px;letter-spacing:0.5px">Codex's moods — a deliberately smaller set</h3>
+<div class="moods">
+  <div class="mood">
+    <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)" stroke="var(--codex)" stroke-width="2"/>
+      <rect x="26" y="14" width="12" height="24" rx="6" fill="var(--face-eye)"/><rect x="62" y="14" width="12" height="24" rx="6" fill="var(--face-eye)"/>
+      <circle cx="32" cy="26" r="3.4" fill="#14141F"/><circle cx="68" cy="26" r="3.4" fill="#14141F"/>
+      <path d="M 40 50 Q 50 56 60 50" stroke="var(--face-eye)" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
+    <div class="name" style="color:var(--codex)">idle</div><div class="why">connected, nothing happening</div>
+  </div>
+  <div class="mood">
+    <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)" stroke="var(--codex)" stroke-width="2"/>
+      <rect x="26" y="17" width="12" height="19" rx="6" fill="var(--face-eye)"/><rect x="62" y="17" width="12" height="19" rx="6" fill="var(--face-eye)"/>
+      <circle cx="34" cy="24" r="3.4" fill="#14141F"/><circle cx="70" cy="24" r="3.4" fill="#14141F"/>
+      <rect x="42" y="48" width="16" height="4" rx="2" fill="var(--face-eye)"/></svg>
+    <div class="name" style="color:var(--codex)">working</div><div class="why">recent session-log activity (mtime-based, no hooks exist for Codex)</div>
+  </div>
+  <div class="mood">
+    <svg width="84" height="56" viewBox="0 0 100 66"><rect width="100" height="66" rx="10" fill="var(--facebg)" stroke="var(--codex)" stroke-width="2"/>
+      <rect x="25" y="26" width="15" height="4" rx="2" fill="var(--face-eye)"/><rect x="60" y="26" width="15" height="4" rx="2" fill="var(--face-eye)"/>
+      <path d="M 38 48 Q 50 57 62 48" stroke="var(--face-eye)" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg>
+    <div class="name" style="color:var(--codex)">done</div><div class="why">a task just finished — squinty smile</div>
+  </div>
+</div>
+<p class="sub" style="margin-top:14px">No waiting or error mood for Codex — its logs have no event type for "needs your
+approval", so guessing one would just be wrong more often than right. That's a scope cut, not
+an oversight.</p>
+
+<h3 style="font-size:14px;color:var(--ink);margin:26px 0 10px;letter-spacing:0.5px">Sharing one face slot</h3>
+<p class="sub">Claude and Codex never fight for space — <code>update_dual_layout()</code>
+in <code>buddy_ui.cpp</code> re-evaluates this on every status frame:</p>
+<div class="diagram-wrap card">
+<svg viewBox="0 0 940 120" role="img" aria-label="Dual face layout: whichever is idle steps aside; both stack if busy at once">
+  <rect x="14" y="20" width="270" height="80" rx="10" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="30" y="45" fill="var(--ink)" font-size="12.5">Codex idle (or no data)</text>
+  <rect x="30" y="58" width="90" height="30" rx="6" fill="var(--facebg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="45" y="77" fill="var(--dim)" font-size="10">Claude, full-size</text>
+
+  <path d="M 288 60 L 334 60" stroke="var(--dim)" fill="none" marker-end="url(#arr3)"/>
+
+  <rect x="336" y="20" width="270" height="80" rx="10" fill="none" stroke="var(--codex)" stroke-width="2"/>
+  <text x="352" y="45" fill="var(--codex)" font-size="12.5">both working at once</text>
+  <rect x="352" y="55" width="112" height="16" rx="4" fill="var(--facebg)" stroke="var(--accent)" stroke-width="1.2"/>
+  <rect x="352" y="74" width="112" height="16" rx="4" fill="var(--facebg)" stroke="var(--codex)" stroke-width="1.2"/>
+  <text x="470" y="65" fill="var(--dim)" font-size="9.5">shrink + stack,</text>
+  <text x="470" y="78" fill="var(--dim)" font-size="9.5">own status line each</text>
+
+  <path d="M 610 60 L 656 60" stroke="var(--dim)" fill="none" marker-end="url(#arr3)"/>
+
+  <rect x="658" y="20" width="270" height="80" rx="10" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="674" y="45" fill="var(--ink)" font-size="12.5">Claude idle (or no data)</text>
+  <rect x="674" y="58" width="90" height="30" rx="6" fill="var(--facebg)" stroke="var(--codex)" stroke-width="1.5"/>
+  <text x="689" y="77" fill="var(--dim)" font-size="10">Codex, full-size</text>
+
+  <defs><marker id="arr3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+    <path d="M0,0 L8,4 L0,8 z" fill="var(--dim)"/></marker></defs>
+</svg>
+</div>
+<p class="sub">Bug that cost two rounds of hardware photos to find: <code>apply_mood()</code>/
+<code>apply_codex_mood()</code> only ever reset eye/mouth <em>size</em>, never their alignment —
+position was assumed fixed-forever at construction. But the stacked view's
+<code>scale_face_shapes()</code> <em>does</em> move eyes/mouth inward as well as shrinking them.
+So going solo again must explicitly restore both size <em>and</em> position from that mood's
+canonical geometry — not just re-run the mood function and assume it's enough.</p>
+
 <h2>What each file does</h2>
 <div class="grid2">
   <div class="card">
     <strong>PC side <span class="tag">Python</span></strong>
     <ul class="filelist" style="margin-top:10px">
-      <li><span class="f">buddy_companion.py</span><span class="d">The brain. Six classes: <b>ClaudeWatcher</b> (transcripts → activity/context), <b>UsageAPI</b> (official limits + token refresh), <b>UsageTracker</b> (token math fallback), <b>OtelReceiver</b> (cost listener), <b>MediaWatcher</b> (now playing + album art + transport commands), and the two <b>transports</b> (USB serial, BLE) with heartbeat.</span></li>
+      <li><span class="f">buddy_companion.py</span><span class="d">The brain. <b>ClaudeWatcher</b> (transcripts → activity/context), <b>CodexWatcher</b> (tails <code>~/.codex/sessions</code> — context/usage/activity, no API needed), <b>UsageAPI</b> (Claude's official limits + token refresh), <b>UsageTracker</b> (token math fallback), <b>OtelReceiver</b> (cost listener), <b>MediaWatcher</b> (now playing + album art + transport commands), and the two <b>transports</b> (USB serial, BLE) with heartbeat.</span></li>
       <li><span class="f">buddy_hook.py</span><span class="d">Fired by Claude Code on every tool use / prompt / notification / stop (registered in <code>~/.claude/settings.json</code>). Writes one event line; never blocks Claude.</span></li>
       <li><span class="f">run_buddy.bat</span><span class="d">Manual launcher with a visible console.</span></li>
       <li><span class="f">start_buddy_hidden.vbs</span><span class="d">Silent launcher; a copy lives in <code>shell:startup</code> so it runs at login.</span></li>
@@ -447,7 +562,7 @@ Long-press the face any time to pet the buddy (it says thanks).</p>
     <strong>Firmware <span class="tag">C++ / LVGL 9</span></strong>
     <ul class="filelist" style="margin-top:10px">
       <li><span class="f">main.cpp</span><span class="d">Setup + loop: parses JSON frames from both links, reassembles album art, reads battery, answers pings, 30 s offline watchdog.</span></li>
-      <li><span class="f">buddy_ui.cpp</span><span class="d">All five screens, the face and its animations (blink, pupil wander, mood morphs, head-bob, the dancer), bars, toasts, pet + swipe gestures.</span></li>
+      <li><span class="f">buddy_ui.cpp</span><span class="d">All six screens, both faces and their animations (blink, pupil wander, mood morphs, head-bob, the dancer), <code>update_dual_layout()</code> arbitrating the shared face slot, bars, toasts, pet + swipe gestures.</span></li>
       <li><span class="f">lvgl_port.c</span><span class="d">Panel + touch glue: QSPI at 40 MHz to the AXS15231B, chunked DMA flush, software rotation to landscape. Built on Waveshare's proven vendor driver (<code>axs15231b/</code>, <code>touch/</code>).</span></li>
       <li><span class="f">ble_link.cpp</span><span class="d">Bluetooth: Nordic-UART-style service advertising as <em>ClaudeBuddy</em>.</span></li>
       <li><span class="f">power_latch.cpp</span><span class="d">Battery power control (diagram below).</span></li>
@@ -504,7 +619,7 @@ Miss that window (like our first firmware did) and the board dies the instant yo
 </div>
 
 <footer>
-  Claude Buddy v1.1 (music update) · built July 2026 · repo: <span class="mono">code\applications\Desktop Buddy</span> ·
+  Claude Buddy v1.2 (Codex update) · built July 2026 · repo: <span class="mono">code\applications\Desktop Buddy</span> ·
   full setup &amp; troubleshooting in the README
 </footer>
 </main>
