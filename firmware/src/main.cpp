@@ -208,6 +208,15 @@ static void handle_line(const char *line)
             }
             buddy_set_context(doc["ctx"] | -1,
                               doc["ctxt"] | (const char *)nullptr);
+            if (doc["cdx"].is<JsonObject>()) {
+                JsonObject c = doc["cdx"];
+                buddy_set_codex(c["ctx"] | -1, c["ctxt"] | (const char *)nullptr,
+                                 c["pct"] | -1, c["rst"] | (const char *)nullptr);
+                buddy_mood_t cmood = mood_from_state(c["state"] | (const char *)nullptr);
+                buddy_set_codex_status(cmood, c["head"] | (const char *)nullptr,
+                                       c["msg"] | (const char *)nullptr,
+                                       c["proj"] | (const char *)nullptr);
+            }
             if (doc["med"].is<JsonObject>()) {
                 JsonObject m = doc["med"];
                 const char *st = m["st"] | "";

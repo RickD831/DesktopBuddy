@@ -1,8 +1,10 @@
 """Claude Buddy companion — feeds the Waveshare ESP32-S3 buddy display.
 
 Runs on Windows. Every couple of seconds it sends a JSON status line over
-USB serial: CPU/RAM usage, clock, and what Claude Code is currently doing
-(inferred from session transcript activity under ~/.claude/projects).
+USB serial: CPU/RAM usage, clock, what Claude Code is currently doing
+(inferred from session transcript activity under ~/.claude/projects), and
+what OpenAI's Codex CLI is doing (inferred from its session logs under
+~/.codex/sessions — see CodexWatcher).
 
 Usage:
     python buddy_companion.py            # auto-detect the board's COM port
@@ -14,7 +16,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 try:
@@ -374,6 +376,162 @@ class ClaudeWatcher:
         except (OSError, ValueError):
             pass
         return None
+
+
+CODEX_SESSIONS = Path.home() / ".codex" / "sessions"
+
+
+class CodexWatcher:
+    """Context-window and usage-limit gauges for OpenAI's Codex CLI/desktop
+    app, read straight from its local session logs (no API/OAuth needed).
+    Codex writes a "token_count" event after every turn to
+    ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl with both the running
+    token total against the model's context window, and OpenAI's own
+    rate-limit percentage for the account (the same numbers Codex itself
+    shows)."""
+
+    def __init__(self) -> None:
+        self._newest_file: Path | None = None
+        self._last_scan = 0.0
+        self._last_active = 0.0
+
+    def _rescan(self) -> None:
+        self._last_scan = time.time()
+        for days_back in (0, 1):
+            day = datetime.now() - timedelta(days=days_back)
+            day_dir = CODEX_SESSIONS / f"{day:%Y/%m/%d}"
+            try:
+                files = list(day_dir.glob("rollout-*.jsonl"))
+            except OSError:
+                files = []
+            if files:
+                self._newest_file = max(files, key=lambda f: f.stat().st_mtime)
+                return
+        self._newest_file = None
+
+    @staticmethod
+    def _fmt_reset(epoch: float) -> str:
+        try:
+            s = int(epoch - time.time())
+            if s <= 0:
+                return "now"
+            d, rem = divmod(s, 86400)
+            h, m = divmod(rem, 3600)
+            return f"{d}d {h}h" if d else f"{h}h {m // 60:02d}m"
+        except (TypeError, ValueError):
+            return ""
+
+    def snapshot(self) -> dict:
+        """{"ctx", "ctxt", "pct", "rst"} — only fields that parsed."""
+        if time.time() - self._last_scan > RESCAN_INTERVAL or self._newest_file is None:
+            self._rescan()
+        if self._newest_file is None:
+            return {}
+        try:
+            with open(self._newest_file, "rb") as fh:
+                fh.seek(0, os.SEEK_END)
+                size = fh.tell()
+                fh.seek(max(0, size - 32768))
+                chunk = fh.read().decode("utf-8", errors="replace")
+        except OSError:
+            return {}
+        for line in reversed(chunk.strip().splitlines()):
+            if '"token_count"' not in line:
+                continue
+            try:
+                entry = json.loads(line)
+                info = entry["payload"]["info"]
+            except (json.JSONDecodeError, KeyError, TypeError):
+                continue
+            out: dict = {}
+            try:
+                # last_token_usage is what was actually sent to the model on
+                # the most recent turn (i.e. current context fill).
+                # total_token_usage is a cumulative session total and can
+                # exceed the context window entirely — not usable here.
+                ctx = info["last_token_usage"]["total_tokens"]
+                window = info["model_context_window"]
+                if window > 0:
+                    out["ctx"] = round(ctx / window * 100)
+                    out["ctxt"] = f"{_fmt_tokens(ctx)} / {_fmt_tokens(window)}"
+            except (KeyError, TypeError, ZeroDivisionError):
+                pass
+            try:
+                primary = entry["payload"]["rate_limits"]["primary"]
+                out["pct"] = round(primary["used_percent"])
+                if primary.get("resets_at"):
+                    out["rst"] = self._fmt_reset(float(primary["resets_at"]))
+            except (KeyError, TypeError, ValueError):
+                pass
+            return out
+        return {}
+
+    @staticmethod
+    def _describe(payload: dict) -> str:
+        """Short human text for what Codex is doing right now, from the
+        inner payload.type of the last event line."""
+        kind = payload.get("type")
+        if kind == "function_call":
+            return f"using {payload.get('name', 'a tool')}"[:80]
+        if kind == "agent_message":
+            return "writing a reply"
+        if kind == "user_message":
+            return "reading your message"
+        if kind == "reasoning":
+            return "thinking"
+        return "working"
+
+    def status(self) -> tuple[str, str, str]:
+        """Returns (state, msg, project), mirroring ClaudeWatcher.status()
+        but mtime-only — Codex has no hook-file equivalent and no reliable
+        "needs approval" signal in the logs, so only working/done/idle."""
+        now = time.time()
+        if now - self._last_scan > RESCAN_INTERVAL or self._newest_file is None:
+            self._rescan()
+        if self._newest_file is None:
+            return "idle", "", ""
+        try:
+            mtime = self._newest_file.stat().st_mtime
+        except OSError:
+            return "idle", "", ""
+        age = now - mtime
+
+        if age > ACTIVE_WINDOW:
+            if self._last_active and now - self._last_active <= DONE_WINDOW:
+                return "done", "finished a task", ""
+            return "idle", "", ""
+        self._last_active = now
+
+        try:
+            with open(self._newest_file, "rb") as fh:
+                fh.seek(0, os.SEEK_END)
+                size = fh.tell()
+                fh.seek(max(0, size - 16384))
+                chunk = fh.read().decode("utf-8", errors="replace")
+        except OSError:
+            return "working", "working", ""
+
+        msg = "working"
+        proj = ""
+        for line in reversed(chunk.strip().splitlines()):
+            line = line.strip()
+            if not line.startswith("{"):
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            payload = entry.get("payload")
+            if not isinstance(payload, dict):
+                continue
+            if not proj and isinstance(payload.get("cwd"), str):
+                proj = os.path.basename(payload["cwd"])
+            if msg == "working" and payload.get("type") not in (
+                    "session_meta", "turn_context", "task_started"):
+                msg = self._describe(payload)
+            if msg != "working" and proj:
+                break
+        return "working", msg, proj
 
 
 class UsageAPI:
@@ -916,10 +1074,17 @@ HEADLINES = {
     "sleep": "resting",
 }
 
+CODEX_HEADLINES = {
+    "working": "Codex is working",
+    "done": "Codex finished a task",
+    "idle": "Codex standing by",
+}
+
 
 def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None,
         media: "MediaWatcher | None" = None) -> None:
     watcher = ClaudeWatcher()
+    codex = CodexWatcher()
     usage_api = usage_api or UsageAPI()
     psutil.cpu_percent(interval=None)  # prime the counter
 
@@ -965,6 +1130,13 @@ def run(transport, usage: UsageTracker, usage_api: "UsageAPI | None" = None,
             ctx = watcher.context()
             if ctx:
                 frame["ctx"], frame["ctxt"] = ctx
+            cdx = codex.snapshot()
+            cstate, cmsg, cproj = codex.status()
+            cdx["state"] = cstate
+            cdx["head"] = CODEX_HEADLINES.get(cstate, cstate)
+            cdx["msg"] = cmsg
+            cdx["proj"] = cproj
+            frame["cdx"] = cdx
             if media:
                 m = media.snapshot()
                 if m:

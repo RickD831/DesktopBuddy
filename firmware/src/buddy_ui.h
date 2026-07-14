@@ -44,6 +44,13 @@ void buddy_set_battery(int pct, bool charging, bool ble);
 /* Context window of the active session. pct -1 = unknown, txt e.g. "323k / 1.0M". */
 void buddy_set_context(int pct, const char *txt);
 
+/* Codex CLI gauges (mirrors Claude's context + usage above). -1/NULL = unknown. */
+void buddy_set_codex(int ctx_pct, const char *ctx_txt, int use_pct, const char *reset);
+
+/* Codex's own face/mood/status — drives the dual-face layout alongside
+ * buddy_set_mood()/buddy_set_status() above. NULL strings leave text unchanged. */
+void buddy_set_codex_status(buddy_mood_t mood, const char *headline, const char *msg, const char *proj);
+
 /* Now playing. playing: 1 playing, 0 paused, -1 nothing. pos/dur in seconds. */
 void buddy_set_media(const char *title, const char *artist, const char *app,
                      int playing, int pos, int dur);
