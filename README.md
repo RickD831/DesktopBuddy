@@ -214,3 +214,7 @@ just isn't there. If this comes back: the PC-side companion already has a
 real speaker and full Bluetooth, so playing sounds from there (triggered by
 the same events that already drive the screen) is the path of least
 resistance, not the board itself.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
